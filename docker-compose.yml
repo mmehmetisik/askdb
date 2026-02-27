@@ -1,0 +1,41 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://text2sql:text2sql@db:5432/text2sql
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: text2sql
+      POSTGRES_PASSWORD: text2sql
+      POSTGRES_DB: text2sql
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U text2sql"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Optional: Redis for distributed cache & rate limiting
+  # Activate with: docker compose --profile with-redis up
+  redis:
+    image: redis:7-alpine
+    profiles: ["with-redis"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

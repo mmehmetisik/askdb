@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ML Studio | AskDB</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="style.css?v=1.0.0" />
+  <link rel="stylesheet" href="analysis.css?v=1.0.0" />
+  <link rel="stylesheet" href="ml.css?v=1.0.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    if (!localStorage.getItem('isLoggedIn')) window.location.href = 'login.html';
+    var _role = localStorage.getItem('role');
+    if (_role !== 'data_scientist' && _role !== 'admin') {
+      window.location.href = 'login.html';
+    }
+    if (localStorage.getItem('theme') === 'light') document.documentElement.classList.add('light');
+  </script>
+</head>
+<body>
+
+<div class="analysis-layout">
+  <!-- ============ LEFT SIDEBAR ============ -->
+  <aside class="analysis-sidebar">
+    <div class="sidebar-header">
+      <h1><i class="fas fa-brain"></i> <span class="text-gradient" data-i18n="ml.title">ML Studio</span></h1>
+      <div class="subtitle" data-i18n="ml.subtitle">Machine Learning Workspace</div>
+    </div>
+
+    <!-- ML Tasks Section -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-header">
+        <div class="sidebar-section-title">
+          <i class="fas fa-database"></i> <span data-i18n="ml.tasks">ML Gorevleri</span>
+          <span class="report-badge" id="taskBadge" style="display:none;">0</span>
+        </div>
+        <button class="btn-refresh-schema" onclick="loadMLTasks()" data-i18n-title="common.refresh" title="Yenile">
+          <i class="fas fa-sync-alt"></i>
+        </button>
+      </div>
+      <div id="taskList" class="report-list">
+        <div class="schema-loading"><i class="fas fa-circle-notch fa-spin"></i> <span data-i18n="common.loading">Yukleniyor...</span></div>
+      </div>
+    </div>
+
+    <!-- Saved Models Section -->
+    <div class="sidebar-section ml-models-sidebar">
+      <div class="sidebar-section-header">
+        <div class="sidebar-section-title">
+          <i class="fas fa-save"></i> <span data-i18n="ml.models">Modeller</span>
+          <span class="report-badge" id="modelBadge" style="display:none;">0</span>
+        </div>
+        <button class="btn-refresh-schema" onclick="loadSavedModels()" data-i18n-title="common.refresh" title="Yenile">
+          <i class="fas fa-sync-alt"></i>
+        </button>
+      </div>
+      <div id="modelList" class="report-list"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">D</div>
+        <div>
+          <div class="user-name" id="userName">user</div>
+          <div class="user-role" id="userRole">Data Scientist</div>
+        </div>
+      </div>
+      <div class="sidebar-actions">
+        <a href="analysis.html" class="btn-theme" data-i18n-title="ml.analysisPage" title="Analiz Sayfasi" style="text-decoration:none;">
+          <i class="fas fa-chart-bar"></i>
+        </a>
+        <button class="btn-theme" onclick="I18n.setLang(I18n.getLang()==='tr'?'en':'tr')" title="TR/EN" style="font-size:0.65rem;">TR/EN</button>
+        <button class="btn-theme" onclick="toggleThemeML()" id="themeToggleBtn" title="Dark/Light">
+          <i class="fas fa-moon"></i>
+        </button>
+        <button class="btn-logout" onclick="logoutML()"><i class="fas fa-sign-out-alt"></i></button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN CONTENT ============ -->
+  <main class="analysis-main">
+    <!-- Header -->
+    <div class="analysis-header" id="mlHeader">
+      <div class="analysis-header-left">
+        <div class="analysis-title-row">
+          <h2 id="mlHeaderTitle"><i class="fas fa-brain"></i> <span data-i18n="ml.title">ML Studio</span></h2>
+        </div>
+        <span class="report-meta" id="mlMeta"></span>
+      </div>
+      <div class="analysis-header-right" id="mlActions" style="display:none;">
+        <span class="ml-job-status" id="mlJobStatus"></span>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div class="analysis-empty" id="mlEmpty">
+      <i class="fas fa-brain"></i>
+      <h3 data-i18n="ml.selectTask">Bir ML gorevi secin</h3>
+      <p><span data-i18n="ml.selectTaskDesc">Soldaki listeden modellemek istediginiz ML gorevini secin.</span><br>
+      <span data-i18n="ml.selectTaskHint">Oncelikle Analiz sayfasindan "ML'e Gonder" ile veri gonderin.</span></p>
+    </div>
+
+    <!-- Workspace (hidden until task selected) -->
+    <div class="analysis-workspace" id="mlWorkspace" style="display:none;">
+      <!-- ML Tabs -->
+      <div class="eda-toolbar">
+        <div class="eda-tabs">
+          <button class="eda-tab active" data-tab="config" onclick="switchMLTab('config')">
+            <i class="fas fa-cogs"></i> <span data-i18n="ml.tabs.config">Yapilandirma</span>
+          </button>
+          <button class="eda-tab" data-tab="leaderboard" onclick="switchMLTab('leaderboard')">
+            <i class="fas fa-trophy"></i> <span data-i18n="ml.tabs.leaderboard">Sonuclar</span>
+          </button>
+          <button class="eda-tab" data-tab="viz" onclick="switchMLTab('viz')">
+            <i class="fas fa-chart-area"></i> <span data-i18n="ml.tabs.viz">Gorsellestirme</span>
+          </button>
+          <button class="eda-tab" data-tab="predict" onclick="switchMLTab('predict')">
+            <i class="fas fa-magic"></i> <span data-i18n="ml.tabs.predict">Tahmin</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Panels -->
+      <div class="eda-content" style="max-height:none;">
+        <div class="eda-panel active" id="mlConfigPanel"></div>
+        <div class="eda-panel" id="mlLeaderboardPanel"></div>
+        <div class="eda-panel" id="mlVizPanel"></div>
+        <div class="eda-panel" id="mlPredictPanel"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/i18n.js?v=1.0.0"></script>
+<script src="js/helpers.js?v=1.0.0"></script>
+<script src="js/ml-app.js?v=1.0.0"></script>
+<script src="js/ml-config.js?v=1.0.0"></script>
+<script src="js/ml-train.js?v=1.0.0"></script>
+<script src="js/ml-predict.js?v=1.0.0"></script>
+</body>
+</html>

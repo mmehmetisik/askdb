@@ -1,0 +1,26 @@
+fastapi
+uvicorn[standard]
+asyncpg
+python-dotenv
+groq
+python-jose[cryptography]
+bcrypt
+# Opsiyonel: Coklu LLM destegi
+openai
+anthropic
+# Opsiyonel: Coklu DB destegi
+aiomysql
+pymssql
+# Opsiyonel: Trino (cross-DB federation)
+trino
+# SQL guvenlik (AST parser)
+sqlglot>=23.0.0
+# Test
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27
+# ML Studio
+scikit-learn
+joblib
+# Opsiyonel: Redis cache & rate limiting
+redis[hiredis]

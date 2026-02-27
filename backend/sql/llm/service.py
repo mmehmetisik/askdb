@@ -1,0 +1,158 @@
+from backend.core.config import BUSINESS_LOGIC, FEW_SHOT_EXAMPLES, DB_TYPE, DB_MODE, logger, get_active_schema
+from .providers import build_llm_chain
+
+# LLM zincirini baslat
+_chain = build_llm_chain()
+
+# Dialect bilgisi
+_DIALECT_MAP = {
+    "postgresql": "PostgreSQL",
+    "postgres": "PostgreSQL",
+    "mysql": "MySQL",
+    "mssql": "Microsoft SQL Server (T-SQL)",
+    "trino": "Trino (ANSI SQL)",
+}
+
+
+def _clean_sql(sql: str) -> str:
+    """LLM ciktisindaki markdown isaretlerini temizle."""
+    if sql.startswith("```sql"):
+        sql = sql[6:]
+    if sql.startswith("```"):
+        sql = sql[3:]
+    if sql.endswith("```"):
+        sql = sql[:-3]
+    return sql.strip()
+
+
+def _get_dialect_name() -> str:
+    if DB_MODE == "trino":
+        return "Trino (ANSI SQL)"
+    return _DIALECT_MAP.get(DB_TYPE.lower(), "PostgreSQL")
+
+
+def _get_dialect_notes() -> str:
+    """Dialect'e ozel notlar."""
+    dialect = DB_TYPE.lower()
+    if dialect in ("postgresql", "postgres"):
+        return "- ILIKE buyuk/kucuk harf duyarsiz arama icin kullan.\n- LIMIT ile sonuc sinirla."
+    elif dialect == "mysql":
+        return "- LIKE (case-insensitive by default in MySQL) kullan.\n- LIMIT ile sonuc sinirla.\n- Backtick (`) ile reserved kelimeleri koru."
+    elif dialect == "mssql":
+        return "- LIKE kullan (buyuk/kucuk harf duyarliligi collation'a bagli).\n- TOP N ile sonuc sinirla (LIMIT yok).\n- Tarih islemlerinde DATEADD/DATEDIFF kullan.\n- GETDATE() fonksiyonunu kullan (NOW() yok)."
+    if DB_MODE == "trino":
+        return (
+            "- Trino ANSI SQL kullanir.\n"
+            "- LIMIT ile sonuc sinirla.\n"
+            "- Tablo adlarini catalog.schema.table formatinda yaz.\n"
+            "- LOWER() ile buyuk/kucuk harf duyarsiz arama yap.\n"
+            "- Sadece SELECT sorgusu yaz, Trino read-only.\n"
+            "- CAST(x AS type) ile tip donusumu yap.\n"
+            "- CURRENT_DATE, CURRENT_TIMESTAMP kullan."
+        )
+    return ""
+
+
+async def generate_sql(question: str, selected_tables: list[str] | None = None) -> str:
+    schema = get_active_schema()
+    dialect = _get_dialect_name()
+    dialect_notes = _get_dialect_notes()
+
+    table_hint = ""
+    if selected_tables:
+        table_hint = f"\n[ODAKLANILACAK TABLOLAR]\nKullanici su tablolari secti: {', '.join(selected_tables)}. Sorguyu ONCELIKLE bu tablolar uzerinden olustur. Gerekirse bu tablolari JOIN ile birlestir.\n"
+
+    prompt = f"""Sen uzman bir {dialect} gelistiricisisin.
+Asagidaki veritabani semasina, is kurallarina ve ornek sorgulara gore kullanicinin sorusunu cevaplayacak en dogru SQL sorgusunu yaz.
+Sadece SQL sorgusu uret.
+Kesinlikle aciklama yazma.
+Markdown (```sql vb.) KULLANMA.
+
+[VERITABANI TIPI]
+{dialect}
+
+[DIALECT KURALLARI]
+{dialect_notes}
+
+[VERITABANI SEMASI]
+{schema}
+{table_hint}
+[IS KURALLARI VE SOZLUK]
+{BUSINESS_LOGIC}
+
+[ORNEK SORGULAR]
+{FEW_SHOT_EXAMPLES}
+
+[KULLANICI SORUSU]
+Soru: {question}
+SQL:"""
+
+    response = await _chain.generate(
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        max_tokens=512,
+    )
+    result = _clean_sql(response)
+    logger.info(f"[LLM] Provider: {_chain.active_provider_name}")
+    return result
+
+
+async def retry_safe_sql(question: str, bad_sql: str) -> str:
+    """Tehlikeli SQL geldiginde LLM'den sadece SELECT sorgusu iste."""
+    schema = get_active_schema()
+    dialect = _get_dialect_name()
+
+    prompt = f"""Onceki sorgun tehlikeli komutlar iceriyordu ve REDDEDILDI:
+{bad_sql}
+
+KURALLAR:
+- SADECE SELECT veya WITH ... SELECT sorgusu yaz.
+- DELETE, UPDATE, INSERT, DROP, ALTER, TRUNCATE gibi komutlar YASAK.
+- Sadece veri OKUMA islemi yap.
+- Aciklama yazma, sadece SQL ver.
+- Markdown kullanma.
+- Veritabani tipi: {dialect}
+
+[VERITABANI SEMASI]
+{schema}
+
+Kullanici sorusu: {question}
+Guvenli SQL:"""
+
+    response = await _chain.generate(
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        max_tokens=512,
+    )
+    return _clean_sql(response)
+
+
+async def interpret_results(question: str, sql: str, result: list) -> str:
+    """Sorgu sonucunu Turkce olarak yorumla."""
+    try:
+        result_preview = str(result[:11])
+        response = await _chain.generate(
+            messages=[{"role": "user", "content": f"""Asagidaki SQL sorgu sonucunu Turkce olarak kisa ve net yorumla.
+Kullanicinin sorusu: {question}
+SQL: {sql}
+Sonuc (ilk 10 satir): {result_preview}
+Toplam satir: {len(result)-1}
+
+2-3 cumle ile ozetini yaz. Rakamlar varsa vurgula. Emoji kullanma."""}],
+            temperature=0.3,
+            max_tokens=200,
+        )
+        logger.info(f"[AI YORUM] {response}")
+        return response
+    except Exception as e:
+        logger.warning(f"[AI YORUM HATASI] {e}")
+        return ""
+
+
+def get_llm_info() -> dict:
+    """Aktif LLM bilgisini dondur."""
+    return {
+        "active_provider": _chain.active_provider_name,
+        "provider_count": len(_chain.providers),
+        "providers": [p.name() for p in _chain.providers],
+    }

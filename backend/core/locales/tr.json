@@ -1,0 +1,68 @@
+{
+  "auth": {
+    "invalidCredentials": "Hatali kullanici adi veya sifre!",
+    "loggedOut": "Cikis yapildi."
+  },
+  "users": {
+    "created": "Kullanici basariyla olusturuldu.",
+    "alreadyExists": "Bu kullanici adi zaten alinmis.",
+    "notFound": "Kullanici bulunamadi.",
+    "deleted": "Kullanici basariyla silindi.",
+    "trinoUpdated": "Trino erisimi guncellendi",
+    "profileUpdated": "Kullanici profili guncellendi."
+  },
+  "connections": {
+    "created": "Baglanti basariyla eklendi.",
+    "updated": "Baglanti guncellendi.",
+    "deleted": "Baglanti silindi.",
+    "notFound": "Baglanti bulunamadi",
+    "testSuccess": "Baglanti basarili!",
+    "testFailed": "Baglanti basarisiz: {error}",
+    "unsupportedType": "Desteklenmeyen DB tipi: {type}",
+    "discoverError": "Tablo kesfetme hatasi: {error}",
+    "tablesUpdated": "Izinli tablolar guncellendi."
+  },
+  "query": {
+    "rateLimited": "Sorgu limiti asildi. {seconds} saniye sonra tekrar deneyin.",
+    "rateLimitedShort": "Sorgu limiti asildi.",
+    "unsafeSql": "Guvenli olmayan SQL sorgusu. Sadece SELECT sorgulari calistirilabilir.",
+    "unsafeSqlRetry": "3 deneme yapildi ancak guvenli bir SELECT sorgusu uretilemedi.",
+    "processingError": "Sorgu islenirken bir hata olustu: {error}",
+    "sqlError": "SQL hatasi: {error}",
+    "noResult": "Sonuc Yok",
+    "errorHeader": "Hata",
+    "couldNotGenerate": "Guvenli SQL uretilemedi"
+  },
+  "schema": {
+    "refreshed": "Schema yenilendi.",
+    "tableNoAccess": "Bu tabloya erisim izni yok."
+  },
+  "reports": {
+    "saved": "Rapor basariyla kaydedildi.",
+    "notFound": "Rapor bulunamadi",
+    "noAccess": "Bu rapora erisim yetkiniz yok",
+    "noUpdateAccess": "Bu raporu guncelleme yetkiniz yok",
+    "noDeleteAccess": "Bu raporu silme yetkiniz yok",
+    "updated": "Rapor guncellendi.",
+    "noChange": "Degisiklik yok",
+    "deleted": "Rapor silindi.",
+    "userNotFound": "Kullanici bulunamadi",
+    "targetNotFound": "Hedef kullanici bulunamadi"
+  },
+  "ml": {
+    "taskCreated": "ML gorevi basariyla olusturuldu."
+  },
+  "profiles": {
+    "created": "Profil olusturuldu.",
+    "updated": "Profil guncellendi.",
+    "deleted": "Profil silindi.",
+    "notFound": "Profil bulunamadi",
+    "alreadyExists": "Bu isimde bir profil zaten var."
+  },
+  "cache": {
+    "cleared": "Cache temizlendi."
+  },
+  "trino": {
+    "deactivated": "Trino deaktif edildi"
+  }
+}

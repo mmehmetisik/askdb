@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Paneli | Text - SQL Studio</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗄️</text></svg>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/admin.css?v=1.0.0">
+    <script>
+        if (localStorage.getItem('role') !== 'admin') {
+            window.location.href = 'login.html';
+        }
+    </script>
+</head>
+<body>
+    <div class="background-glow"></div>
+
+    <header class="app-header">
+        <h1><i class="fas fa-users-cog text-gradient"></i> <span data-i18n="admin.title">Admin Paneli</span></h1>
+        <p class="description" data-i18n="admin.subtitle">Kullanici ve veritabani yonetimi</p>
+        <div style="display: flex; gap: 10px; margin-top: 10px; justify-content: center;">
+            <a href="index.html" style="text-decoration:none;">
+                <button type="button" style="width: auto; padding: 5px 15px; font-size: 0.8rem; background: rgba(79,143,247,0.1); border: 1px solid rgba(79,143,247,0.2); color: #4f8ff7;">
+                    <i class="fas fa-terminal"></i> <span data-i18n="admin.queryPage">Sorgu Sayfasi</span>
+                </button>
+            </a>
+            <a href="analysis.html" style="text-decoration:none;">
+                <button type="button" style="width: auto; padding: 5px 15px; font-size: 0.8rem; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); color: #22c55e;">
+                    <i class="fas fa-chart-bar"></i> <span data-i18n="admin.analysisPage">Analiz Workspace</span>
+                </button>
+            </a>
+            <button onclick="logout()" style="width: auto; padding: 5px 15px; font-size: 0.8rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                <i class="fas fa-sign-out-alt"></i> <span data-i18n="common.logout">Cikis</span>
+            </button>
+            <button onclick="I18n.setLang(I18n.getLang()==='tr'?'en':'tr')" style="width: auto; padding: 5px 15px; font-size: 0.8rem; background: none; border: 1px solid var(--border-color); color: var(--text-muted);">
+                <i class="fas fa-globe"></i> TR/EN
+            </button>
+        </div>
+    </header>
+
+    <div class="admin-container">
+        <!-- Tab Navigation -->
+        <div class="card fade-in" style="padding: 0; overflow: hidden;">
+            <div class="admin-tabs">
+                <button class="admin-tab active" onclick="switchTab('users')">
+                    <i class="fas fa-users"></i> <span data-i18n="admin.tabs.users">Kullanicilar</span>
+                </button>
+                <button class="admin-tab" onclick="switchTab('databases')">
+                    <i class="fas fa-database"></i> <span data-i18n="admin.tabs.databases">Veritabanlari</span>
+                </button>
+                <button class="admin-tab" onclick="switchTab('stats')">
+                    <i class="fas fa-chart-bar"></i> <span data-i18n="admin.tabs.stats">Istatistikler</span>
+                </button>
+                <button class="admin-tab" onclick="switchTab('profiles')">
+                    <i class="fas fa-shield-alt"></i> <span data-i18n="admin.tabs.profiles">Profiller</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 1: Kullanicilar -->
+        <div id="tab-users" class="tab-content active">
+            <div class="card fade-in">
+                <h2><i class="fas fa-user-plus"></i> <span data-i18n="admin.users.addTitle">Yeni Kullanici Ekle</span></h2>
+                <form id="createUserForm" style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="login.username">Kullanici Adi</label>
+                        <input type="text" id="newUsername" class="admin-input" required placeholder="demo_user">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.users.password">Sifre (min 6 karakter)</label>
+                        <input type="password" id="newPassword" class="admin-input" required minlength="6" placeholder="--------">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.users.role">Yetki (Rol)</label>
+                        <select id="newRole" class="admin-input">
+                            <option value="analyst" data-i18n="admin.users.roleAnalyst">Analyst (Sorgu Yazma)</option>
+                            <option value="reporter" data-i18n="admin.users.roleReporter">Reporter (Rapor Analiz)</option>
+                            <option value="data_scientist" data-i18n="admin.users.roleDataScientist">Data Scientist (Analiz + ML)</option>
+                            <option value="admin" data-i18n="admin.users.roleAdmin">Admin (Tam Yetki)</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.users.profile">Erisim Profili</label>
+                        <select id="newProfileId" class="admin-input">
+                            <option value="" data-i18n="admin.users.profileNone">Tam Erisim (Profil Yok)</option>
+                        </select>
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <div class="checkbox-group" style="margin-top: 18px;">
+                            <input type="checkbox" id="newTrinoAccess">
+                            <label for="newTrinoAccess"><i class="fas fa-project-diagram" style="color:#a855f7;"></i> <span data-i18n="admin.users.trinoAccess">Trino (Cross-DB) Erisimi Ver</span></label>
+                        </div>
+                    </div>
+                    <button type="submit" id="createBtn" style="grid-column: span 3; background: linear-gradient(135deg, var(--accent-secondary), #d946ef); margin-top: 10px;">
+                        <span data-i18n="admin.users.createBtn">Kullanici Olustur</span> <i class="fas fa-check"></i>
+                    </button>
+                    <div id="statusMsg" style="grid-column: span 3; margin-top: 10px; font-size: 0.9rem; display: none; text-align: center;"></div>
+                </form>
+            </div>
+
+            <div class="card fade-in" style="animation-delay: 0.2s;">
+                <h2><i class="fas fa-list"></i> <span data-i18n="admin.users.listTitle">Mevcut Kullanicilar</span></h2>
+                <div class="table-wrapper" style="margin-top: 1.5rem;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th data-i18n="admin.users.thId">ID</th>
+                                <th data-i18n="admin.users.thUsername">Kullanici Adi</th>
+                                <th data-i18n="admin.users.thRole">Rol</th>
+                                <th data-i18n="admin.users.thTrino">Trino</th>
+                                <th data-i18n="admin.users.thProfile">Profil</th>
+                                <th data-i18n="admin.users.thDate">Tarih</th>
+                                <th data-i18n="admin.users.thAction">Islem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr><td colspan="7" style="text-align:center;">Yukleniyor...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Veritabanlari -->
+        <div id="tab-databases" class="tab-content">
+            <div class="card fade-in">
+                <h2><i class="fas fa-plus-circle"></i> <span data-i18n="admin.connections.addTitle">Yeni Baglanti Ekle</span></h2>
+                <form id="createConnForm" style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: end;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.connections.name">Baglanti Adi</label>
+                        <input type="text" id="connName" class="admin-input" required placeholder="ornek: musteri_db">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.connections.dbType">Veritabani Tipi</label>
+                        <select id="connType" class="admin-input" onchange="onDbTypeChange()">
+                            <option value="postgresql">PostgreSQL</option>
+                            <option value="mysql">MySQL / MariaDB</option>
+                            <option value="mssql">Microsoft SQL Server</option>
+                            <option value="trino">Trino (Cross-DB)</option>
+                        </select>
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.connections.host">Host</label>
+                        <input type="text" id="connHost" class="admin-input" required placeholder="ornek: db.supabase.com">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.connections.port">Port</label>
+                        <input type="number" id="connPort" class="admin-input" required value="5432">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.connections.dbName">Veritabani Adi</label>
+                        <input type="text" id="connDatabase" class="admin-input" placeholder="postgres">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.connections.username">Kullanici Adi</label>
+                        <input type="text" id="connUser" class="admin-input" placeholder="admin">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0; grid-column: span 2;">
+                        <label data-i18n="admin.connections.password">Sifre</label>
+                        <input type="password" id="connPassword" class="admin-input" placeholder="********">
+                    </div>
+                    <div style="grid-column: span 2; display: flex; gap: 10px;">
+                        <button type="button" onclick="testConnection()" style="flex: 1; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: #60a5fa;">
+                            <i class="fas fa-plug"></i> <span data-i18n="admin.connections.testBtn">Baglantiyi Test Et</span>
+                        </button>
+                        <button type="submit" style="flex: 1; background: linear-gradient(135deg, var(--accent-secondary), #d946ef);">
+                            <i class="fas fa-save"></i> <span data-i18n="admin.connections.saveBtn">Kaydet</span>
+                        </button>
+                    </div>
+                    <div id="connStatusMsg" style="grid-column: span 2; margin-top: 5px; font-size: 0.9rem; display: none; text-align: center;"></div>
+                </form>
+            </div>
+
+            <div class="card fade-in" style="animation-delay: 0.2s;">
+                <h2><i class="fas fa-server"></i> <span data-i18n="admin.connections.listTitle">Mevcut Baglantilar</span></h2>
+                <div id="connList" style="margin-top: 1rem;">
+                    <p style="text-align: center; color: var(--text-muted);">Yukleniyor...</p>
+                </div>
+            </div>
+        </div>
+        <!-- TAB 3: Istatistikler -->
+        <div id="tab-stats" class="tab-content">
+            <div class="card fade-in">
+                <h2><i class="fas fa-chart-bar"></i> <span data-i18n="admin.stats.title">Sorgu Istatistikleri</span></h2>
+                <div class="stat-grid" id="statsOverview" style="margin-top: 1.5rem;">
+                    <div class="stat-card"><div class="stat-value" id="statTotal">-</div><div class="stat-label" data-i18n="admin.stats.totalQueries">Toplam Sorgu</div></div>
+                    <div class="stat-card"><div class="stat-value" id="statAvgTime">-</div><div class="stat-label" data-i18n="admin.stats.avgTime">Ort. Sure</div></div>
+                    <div class="stat-card"><div class="stat-value" id="statErrorRate">-</div><div class="stat-label" data-i18n="admin.stats.errorRate">Hata Orani</div></div>
+                    <div class="stat-card"><div class="stat-value" id="statTrinoRate">-</div><div class="stat-label" data-i18n="admin.stats.trinoRate">Trino %</div></div>
+                    <div class="stat-card"><div class="stat-value" id="statCacheRate">-</div><div class="stat-label" data-i18n="admin.stats.cacheRate">Cache Hit %</div></div>
+                </div>
+            </div>
+            <div class="card fade-in" style="animation-delay: 0.2s;">
+                <h2><i class="fas fa-users"></i> <span data-i18n="admin.stats.byUser">Kullanici Bazli</span></h2>
+                <div class="table-wrapper" style="margin-top: 1rem;">
+                    <table>
+                        <thead><tr><th data-i18n="admin.stats.thUser">Kullanici</th><th data-i18n="admin.stats.thQuery">Sorgu</th><th data-i18n="admin.stats.thAvgTime">Ort. Sure</th><th data-i18n="admin.stats.thError">Hata</th><th data-i18n="admin.stats.thDistribution">Dagilim</th></tr></thead>
+                        <tbody id="statsUserBody"><tr><td colspan="5" style="text-align:center;">Yukleniyor...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card fade-in" style="animation-delay: 0.4s;">
+                <h2><i class="fas fa-table"></i> <span data-i18n="admin.stats.topTables">En Cok Sorgulanan Tablolar</span></h2>
+                <div class="table-wrapper" style="margin-top: 1rem;">
+                    <table>
+                        <thead><tr><th data-i18n="admin.stats.thTable">Tablo</th><th data-i18n="admin.stats.thUsage">Kullanim</th><th></th></tr></thead>
+                        <tbody id="statsTableBody"><tr><td colspan="3" style="text-align:center;">Yukleniyor...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Profiller -->
+        <div id="tab-profiles" class="tab-content">
+            <div class="card fade-in">
+                <h2><i class="fas fa-plus-circle"></i> <span data-i18n="admin.profiles.createTitle">Yeni Profil Olustur</span></h2>
+                <form id="createProfileForm" style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: end;">
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.profiles.name">Profil Adi</label>
+                        <input type="text" id="profileName" class="admin-input" required placeholder="Ornek: Finans Ekibi">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label data-i18n="admin.profiles.description">Aciklama</label>
+                        <input type="text" id="profileDesc" class="admin-input" placeholder="Bu profilin amaci...">
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label style="display:block; margin-bottom:8px; font-size:0.9rem; color:var(--text-muted);" data-i18n="admin.profiles.accessTables">Erisim Tablolari</label>
+                        <div id="profileTablesArea" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; background: rgba(0,0,0,0.1);">
+                            <p style="color:var(--text-muted); font-size:0.85rem;" data-i18n="admin.profiles.tablesLoading">Tablo listesi yukleniyor...</p>
+                        </div>
+                    </div>
+                    <button type="submit" style="grid-column: span 2; background: linear-gradient(135deg, var(--accent-secondary), #d946ef); margin-top: 10px;">
+                        <span data-i18n="admin.profiles.createBtn">Profil Olustur</span> <i class="fas fa-check"></i>
+                    </button>
+                    <div id="profileStatusMsg" style="grid-column: span 2; margin-top: 5px; font-size: 0.9rem; display: none; text-align: center;"></div>
+                </form>
+            </div>
+            <div class="card fade-in" style="animation-delay: 0.2s;">
+                <h2><i class="fas fa-shield-alt"></i> <span data-i18n="admin.profiles.listTitle">Mevcut Profiller</span></h2>
+                <div id="profileList" style="margin-top: 1rem;">
+                    <p style="text-align: center; color: var(--text-muted);">Yukleniyor...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/i18n.js?v=1.0.0"></script>
+    <script src="js/store.js?v=1.0.0"></script>
+    <script src="js/admin-app.js?v=1.0.0"></script>
+    <script src="js/admin-users.js?v=1.0.0"></script>
+    <script src="js/admin-connections.js?v=1.0.0"></script>
+    <script src="js/admin-stats.js?v=1.0.0"></script>
+    <script src="js/admin-profiles.js?v=1.0.0"></script>
+</body>
+</html>

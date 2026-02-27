@@ -1,0 +1,408 @@
+import json
+
+from fastapi import APIRouter, HTTPException, Depends, Request
+
+from backend.core.i18n import t as _t, get_lang
+from backend.core.config import logger, build_dynamic_schema
+from backend.core.models import DBConnectionCreate, DBConnectionTest, TableProfileCreate
+from backend.auth import get_current_user, require_admin
+from backend.sql.execution.database import (
+    get_auth_adapter, invalidate_dynamic_tables_cache,
+    activate_trino, deactivate_trino, is_trino_active, get_trino_status,
+)
+from backend.sql.cache.service import get_cache_stats, invalidate_all
+
+router = APIRouter(tags=["admin"])
+
+
+# ── Cache ──
+
+@router.get("/cache-stats")
+async def cache_stats(_admin: dict = Depends(require_admin)):
+    """Cache istatistiklerini dondur (admin-only)."""
+    return get_cache_stats()
+
+
+@router.post("/cache-clear")
+async def cache_clear(request: Request, _admin: dict = Depends(require_admin)):
+    """Tum cache'i temizle (admin-only)."""
+    invalidate_all()
+    return {"success": True, "message": _t("cache.cleared", get_lang(request))}
+
+
+# ── Trino Management ──
+
+@router.post("/trino/activate/{conn_id}")
+async def activate_trino_endpoint(conn_id: int, _admin: dict = Depends(require_admin)):
+    """Trino baglantisini aktif et (admin-only)."""
+    result = await activate_trino(conn_id)
+    adapter = await get_auth_adapter()
+    await adapter.execute_command(
+        "UPDATE db_connections SET is_active = true WHERE id = $1", conn_id
+    )
+    invalidate_dynamic_tables_cache()
+    await build_dynamic_schema()
+    return result
+
+
+@router.post("/trino/deactivate")
+async def deactivate_trino_endpoint(request: Request, _admin: dict = Depends(require_admin)):
+    """Trino baglantisini deaktif et (admin-only)."""
+    status = get_trino_status()
+    conn_id = status["conn_id"]
+    await deactivate_trino()
+    if conn_id:
+        adapter = await get_auth_adapter()
+        await adapter.execute_command(
+            "UPDATE db_connections SET is_active = false WHERE id = $1", conn_id
+        )
+    invalidate_dynamic_tables_cache()
+    await build_dynamic_schema()
+    return {"success": True, "message": _t("trino.deactivated", get_lang(request))}
+
+
+@router.get("/trino/status")
+async def trino_status_endpoint(user: dict = Depends(get_current_user)):
+    """Trino durumunu dondur."""
+    status = get_trino_status()
+    if user["role"] == "admin":
+        status["user_has_access"] = True
+    else:
+        status["user_has_access"] = bool(user.get("trino_access", False))
+    return status
+
+
+# ── DB Connections ──
+
+@router.get("/db-connections")
+async def list_db_connections(_admin: dict = Depends(require_admin)):
+    """Tum veritabani baglantilarini listele (admin-only). Sifreler maskelenir."""
+    adapter = await get_auth_adapter()
+    rows = await adapter.fetch(
+        "SELECT id, name, db_type, host, port, database_name, username, ssl_enabled, is_active, allowed_tables, created_at FROM db_connections ORDER BY id"
+    )
+    return {"success": True, "connections": rows}
+
+
+@router.post("/db-connections")
+async def create_db_connection(req: DBConnectionCreate, request: Request, _admin: dict = Depends(require_admin)):
+    """Yeni veritabani baglantisi ekle (admin-only)."""
+    adapter = await get_auth_adapter()
+    await adapter.execute_command(
+        """INSERT INTO db_connections (name, db_type, host, port, database_name, username, password, ssl_enabled)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+        req.name, req.db_type, req.host, req.port,
+        req.database_name, req.username, req.password, req.ssl_enabled,
+    )
+    invalidate_dynamic_tables_cache()
+    logger.info(f"[DB CONN] New connection added: {req.name} ({req.db_type})")
+    return {"success": True, "message": _t("connections.created", get_lang(request))}
+
+
+@router.put("/db-connections/{conn_id}")
+async def update_db_connection(conn_id: int, req: DBConnectionCreate, request: Request, _admin: dict = Depends(require_admin)):
+    """Veritabani baglantisini guncelle (admin-only)."""
+    adapter = await get_auth_adapter()
+    existing = await adapter.fetchrow("SELECT id FROM db_connections WHERE id = $1", conn_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail=_t("connections.notFound", get_lang(request)))
+    await adapter.execute_command(
+        """UPDATE db_connections SET name=$1, db_type=$2, host=$3, port=$4,
+           database_name=$5, username=$6, password=$7, ssl_enabled=$8, updated_at=NOW()
+           WHERE id=$9""",
+        req.name, req.db_type, req.host, req.port,
+        req.database_name, req.username, req.password, req.ssl_enabled, conn_id,
+    )
+    invalidate_dynamic_tables_cache()
+    logger.info(f"[DB CONN] Connection updated: {req.name} (id={conn_id})")
+    return {"success": True, "message": _t("connections.updated", get_lang(request))}
+
+
+@router.delete("/db-connections/{conn_id}")
+async def delete_db_connection(conn_id: int, request: Request, _admin: dict = Depends(require_admin)):
+    """Veritabani baglantisini sil (admin-only)."""
+    adapter = await get_auth_adapter()
+    existing = await adapter.fetchrow("SELECT id FROM db_connections WHERE id = $1", conn_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail=_t("connections.notFound", get_lang(request)))
+    await adapter.execute_command("DELETE FROM db_connections WHERE id = $1", conn_id)
+    invalidate_dynamic_tables_cache()
+    await build_dynamic_schema()
+    logger.info(f"[DB CONN] Connection deleted: id={conn_id}")
+    return {"success": True, "message": _t("connections.deleted", get_lang(request))}
+
+
+@router.post("/db-connections/test")
+async def test_db_connection(req: DBConnectionTest, request: Request, _admin: dict = Depends(require_admin)):
+    """Verilen bilgilerle veritabanina baglanti testi yap (admin-only)."""
+    from backend.sql.execution.adapters import create_adapter
+
+    if req.db_type == "trino":
+        url = f"trino://{req.username}@{req.host}:{req.port}/{req.database_name}"
+    elif req.db_type == "postgresql":
+        url = f"postgresql://{req.username}:{req.password}@{req.host}:{req.port}/{req.database_name}"
+    elif req.db_type in ("mysql", "mariadb"):
+        url = f"mysql://{req.username}:{req.password}@{req.host}:{req.port}/{req.database_name}"
+    elif req.db_type == "mssql":
+        url = f"mssql://{req.username}:{req.password}@{req.host}:{req.port}/{req.database_name}"
+    else:
+        raise HTTPException(status_code=400, detail=_t("connections.unsupportedType", get_lang(request), type=req.db_type))
+
+    adapter_type = "mysql" if req.db_type == "mariadb" else req.db_type
+
+    try:
+        test_adapter = create_adapter(adapter_type, url)
+        await test_adapter.init()
+        result = await test_adapter.fetchval("SELECT 1")
+        await test_adapter.close()
+        return {"success": True, "message": _t("connections.testSuccess", get_lang(request)), "result": result}
+    except Exception as e:
+        logger.warning(f"[DB CONN TEST] Failed: {req.db_type}://{req.host}:{req.port} - {e}")
+        return {"success": False, "message": _t("connections.testFailed", get_lang(request), error=f"{type(e).__name__}: {e}")}
+
+
+@router.post("/db-connections/{conn_id}/discover")
+async def discover_tables(conn_id: int, request: Request, _admin: dict = Depends(require_admin)):
+    """Veritabanindaki tablolari kesfet (admin-only)."""
+    adapter = await get_auth_adapter()
+    conn = await adapter.fetchrow("SELECT * FROM db_connections WHERE id = $1", conn_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail=_t("connections.notFound", get_lang(request)))
+
+    c = conn if isinstance(conn, dict) else dict(conn)
+    from backend.sql.execution.adapters import create_adapter
+
+    db_type = c["db_type"]
+    if db_type == "trino":
+        url = f"trino://{c['username']}@{c['host']}:{c['port']}/{c['database_name']}"
+    elif db_type == "postgresql":
+        url = f"postgresql://{c['username']}:{c['password']}@{c['host']}:{c['port']}/{c['database_name']}"
+    elif db_type in ("mysql", "mariadb"):
+        url = f"mysql://{c['username']}:{c['password']}@{c['host']}:{c['port']}/{c['database_name']}"
+    elif db_type == "mssql":
+        url = f"mssql://{c['username']}:{c['password']}@{c['host']}:{c['port']}/{c['database_name']}"
+    else:
+        raise HTTPException(status_code=400, detail=_t("connections.unsupportedType", get_lang(request), type=db_type))
+
+    adapter_type = "mysql" if db_type == "mariadb" else db_type
+
+    try:
+        test_adapter = create_adapter(adapter_type, url)
+        await test_adapter.init()
+
+        if db_type == "trino":
+            catalogs_raw = await test_adapter.fetch("SHOW CATALOGS")
+            tables = []
+            for cat_row in catalogs_raw:
+                cat = cat_row["Catalog"] if isinstance(cat_row, dict) else cat_row[0]
+                if cat in ("system", "jmx", "memory"):
+                    continue
+                try:
+                    schemas_raw = await test_adapter.fetch(f"SHOW SCHEMAS FROM \"{cat}\"")
+                    for sch_row in schemas_raw:
+                        schema = sch_row["Schema"] if isinstance(sch_row, dict) else sch_row[0]
+                        if schema == "information_schema":
+                            continue
+                        try:
+                            tables_raw = await test_adapter.fetch(f"SHOW TABLES FROM \"{cat}\".\"{schema}\"")
+                            for t_row in tables_raw:
+                                tbl = t_row["Table"] if isinstance(t_row, dict) else t_row[0]
+                                tables.append({"catalog": cat, "schema": schema, "table": tbl, "full_name": f"{cat}.{schema}.{tbl}"})
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+        else:
+            if db_type == "postgresql":
+                rows = await test_adapter.fetch(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name",
+                    "public"
+                )
+            else:
+                rows = await test_adapter.fetch(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name",
+                    c["database_name"]
+                )
+            tables = []
+            for r in rows:
+                tbl = r["table_name"] if isinstance(r, dict) else r[0]
+                tables.append({"table": tbl, "full_name": tbl})
+
+        await test_adapter.close()
+        return {"success": True, "tables": tables}
+    except Exception as e:
+        logger.error(f"[DB DISCOVER] Error: {e}")
+        return {"success": False, "message": _t("connections.discoverError", get_lang(request), error=f"{type(e).__name__}: {e}"), "tables": []}
+
+
+@router.put("/db-connections/{conn_id}/tables")
+async def update_allowed_tables(conn_id: int, body: dict, request: Request, _admin: dict = Depends(require_admin)):
+    """Baglantinin izinli tablolarini guncelle (admin-only)."""
+    adapter = await get_auth_adapter()
+    existing = await adapter.fetchrow("SELECT id FROM db_connections WHERE id = $1", conn_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail=_t("connections.notFound", get_lang(request)))
+
+    tables = body.get("allowed_tables", [])
+    await adapter.execute_command(
+        "UPDATE db_connections SET allowed_tables = $1, updated_at = NOW() WHERE id = $2",
+        json.dumps(tables, ensure_ascii=False), conn_id,
+    )
+
+    invalidate_dynamic_tables_cache()
+    await build_dynamic_schema()
+    logger.info(f"[DB CONN] Table list updated, schema refreshed (conn_id={conn_id}, {len(tables)} tables)")
+
+    return {"success": True, "message": _t("connections.tablesUpdated", get_lang(request))}
+
+
+# ── Query Statistics ──
+
+@router.get("/stats/overview")
+async def stats_overview(_admin: dict = Depends(require_admin)):
+    """Genel sorgu istatistikleri."""
+    adapter = await get_auth_adapter()
+    row = await adapter.fetchrow("""
+        SELECT
+            COUNT(*) as total_queries,
+            COALESCE(AVG(execution_time_ms), 0) as avg_time_ms,
+            SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
+            SUM(CASE WHEN is_trino = true THEN 1 ELSE 0 END) as trino_count,
+            SUM(CASE WHEN is_cached = true THEN 1 ELSE 0 END) as cached_count
+        FROM query_logs
+    """)
+    r = row if isinstance(row, dict) else dict(row)
+    total = int(r.get("total_queries", 0) or 0)
+    return {
+        "success": True,
+        "total_queries": total,
+        "avg_time_ms": round(float(r.get("avg_time_ms", 0) or 0), 1),
+        "error_count": int(r.get("error_count", 0) or 0),
+        "error_rate": round(int(r.get("error_count", 0) or 0) / max(total, 1) * 100, 1),
+        "trino_count": int(r.get("trino_count", 0) or 0),
+        "trino_rate": round(int(r.get("trino_count", 0) or 0) / max(total, 1) * 100, 1),
+        "cached_count": int(r.get("cached_count", 0) or 0),
+        "cache_rate": round(int(r.get("cached_count", 0) or 0) / max(total, 1) * 100, 1),
+    }
+
+
+@router.get("/stats/by-user")
+async def stats_by_user(_admin: dict = Depends(require_admin)):
+    """Kullanici bazli istatistikler."""
+    adapter = await get_auth_adapter()
+    rows = await adapter.fetch("""
+        SELECT username,
+               COUNT(*) as query_count,
+               COALESCE(AVG(execution_time_ms), 0) as avg_time_ms,
+               SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error_count,
+               SUM(CASE WHEN is_trino = true THEN 1 ELSE 0 END) as trino_count,
+               MAX(created_at) as last_query_at
+        FROM query_logs
+        GROUP BY username
+        ORDER BY query_count DESC
+    """)
+    stats = []
+    for r in rows:
+        r = r if isinstance(r, dict) else dict(r)
+        qc = int(r.get("query_count", 0) or 0)
+        stats.append({
+            "username": r["username"],
+            "query_count": qc,
+            "avg_time_ms": round(float(r.get("avg_time_ms", 0) or 0), 1),
+            "error_count": int(r.get("error_count", 0) or 0),
+            "error_rate": round(int(r.get("error_count", 0) or 0) / max(qc, 1) * 100, 1),
+            "trino_count": int(r.get("trino_count", 0) or 0),
+            "last_query_at": str(r.get("last_query_at", "")),
+        })
+    return {"success": True, "stats": stats}
+
+
+@router.get("/stats/by-table")
+async def stats_by_table(_admin: dict = Depends(require_admin)):
+    """En cok sorgulanan tablolar (tables_used JSON'dan parse)."""
+    adapter = await get_auth_adapter()
+    rows = await adapter.fetch(
+        "SELECT tables_used FROM query_logs WHERE tables_used IS NOT NULL AND tables_used != '[]'"
+    )
+    table_counts = {}
+    for r in rows:
+        tu = r["tables_used"] if isinstance(r, dict) else r[0]
+        if tu:
+            try:
+                tables = json.loads(tu) if isinstance(tu, str) else tu
+                for t in tables:
+                    table_counts[t] = table_counts.get(t, 0) + 1
+            except Exception:
+                pass
+    sorted_tables = sorted(table_counts.items(), key=lambda x: x[1], reverse=True)[:20]
+    return {"success": True, "tables": [{"name": t, "count": c} for t, c in sorted_tables]}
+
+
+# ── Table Profiles ──
+
+@router.get("/table-profiles")
+async def list_table_profiles(_admin: dict = Depends(require_admin)):
+    """Tum tablo erisim profillerini listele."""
+    adapter = await get_auth_adapter()
+    rows = await adapter.fetch(
+        "SELECT id, name, description, allowed_tables, created_at FROM table_profiles ORDER BY id"
+    )
+    profiles = []
+    for r in rows:
+        r = r if isinstance(r, dict) else dict(r)
+        at = r.get("allowed_tables", "[]")
+        tables = json.loads(at) if isinstance(at, str) else at
+        profiles.append({
+            "id": r["id"], "name": r["name"], "description": r.get("description", ""),
+            "allowed_tables": tables, "table_count": len(tables),
+            "created_at": str(r.get("created_at", "")),
+        })
+    return {"success": True, "profiles": profiles}
+
+
+@router.post("/table-profiles")
+async def create_table_profile(req: TableProfileCreate, request: Request, admin: dict = Depends(require_admin)):
+    """Yeni tablo erisim profili olustur."""
+    adapter = await get_auth_adapter()
+    me = await adapter.fetchrow("SELECT id FROM app_users WHERE username = $1", admin["username"])
+    my_id = me["id"] if isinstance(me, dict) else me[0]
+    tables_json = json.dumps(req.allowed_tables, ensure_ascii=False)
+    try:
+        await adapter.execute_command(
+            "INSERT INTO table_profiles (name, description, allowed_tables, created_by) VALUES ($1, $2, $3, $4)",
+            req.name, req.description, tables_json, my_id,
+        )
+    except Exception as e:
+        if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(status_code=400, detail=_t("profiles.alreadyExists", get_lang(request)))
+        raise
+    return {"success": True, "message": _t("profiles.created", get_lang(request))}
+
+
+@router.put("/table-profiles/{profile_id}")
+async def update_table_profile(profile_id: int, req: TableProfileCreate, request: Request, _admin: dict = Depends(require_admin)):
+    """Tablo erisim profilini guncelle."""
+    adapter = await get_auth_adapter()
+    existing = await adapter.fetchrow("SELECT id FROM table_profiles WHERE id = $1", profile_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail=_t("profiles.notFound", get_lang(request)))
+    tables_json = json.dumps(req.allowed_tables, ensure_ascii=False)
+    await adapter.execute_command(
+        "UPDATE table_profiles SET name=$1, description=$2, allowed_tables=$3, updated_at=NOW() WHERE id=$4",
+        req.name, req.description, tables_json, profile_id,
+    )
+    return {"success": True, "message": _t("profiles.updated", get_lang(request))}
+
+
+@router.delete("/table-profiles/{profile_id}")
+async def delete_table_profile(profile_id: int, request: Request, _admin: dict = Depends(require_admin)):
+    """Tablo erisim profilini sil."""
+    adapter = await get_auth_adapter()
+    existing = await adapter.fetchrow("SELECT id FROM table_profiles WHERE id = $1", profile_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail=_t("profiles.notFound", get_lang(request)))
+    await adapter.execute_command(
+        "UPDATE app_users SET table_profile_id = NULL WHERE table_profile_id = $1", profile_id
+    )
+    await adapter.execute_command("DELETE FROM table_profiles WHERE id = $1", profile_id)
+    return {"success": True, "message": _t("profiles.deleted", get_lang(request))}

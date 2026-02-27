@@ -1,0 +1,68 @@
+{
+  "auth": {
+    "invalidCredentials": "Invalid username or password!",
+    "loggedOut": "Logged out."
+  },
+  "users": {
+    "created": "User created successfully.",
+    "alreadyExists": "This username is already taken.",
+    "notFound": "User not found.",
+    "deleted": "User deleted successfully.",
+    "trinoUpdated": "Trino access updated",
+    "profileUpdated": "User profile updated."
+  },
+  "connections": {
+    "created": "Connection added successfully.",
+    "updated": "Connection updated.",
+    "deleted": "Connection deleted.",
+    "notFound": "Connection not found",
+    "testSuccess": "Connection successful!",
+    "testFailed": "Connection failed: {error}",
+    "unsupportedType": "Unsupported DB type: {type}",
+    "discoverError": "Table discovery error: {error}",
+    "tablesUpdated": "Allowed tables updated."
+  },
+  "query": {
+    "rateLimited": "Query limit exceeded. Try again in {seconds} seconds.",
+    "rateLimitedShort": "Query limit exceeded.",
+    "unsafeSql": "Unsafe SQL query. Only SELECT queries can be executed.",
+    "unsafeSqlRetry": "3 attempts were made but a safe SELECT query could not be generated.",
+    "processingError": "An error occurred while processing the query: {error}",
+    "sqlError": "SQL error: {error}",
+    "noResult": "No Result",
+    "errorHeader": "Error",
+    "couldNotGenerate": "Could not generate safe SQL"
+  },
+  "schema": {
+    "refreshed": "Schema refreshed.",
+    "tableNoAccess": "No access permission for this table."
+  },
+  "reports": {
+    "saved": "Report saved successfully.",
+    "notFound": "Report not found",
+    "noAccess": "You do not have access to this report",
+    "noUpdateAccess": "You do not have permission to update this report",
+    "noDeleteAccess": "You do not have permission to delete this report",
+    "updated": "Report updated.",
+    "noChange": "No changes",
+    "deleted": "Report deleted.",
+    "userNotFound": "User not found",
+    "targetNotFound": "Target user not found"
+  },
+  "ml": {
+    "taskCreated": "ML task created successfully."
+  },
+  "profiles": {
+    "created": "Profile created.",
+    "updated": "Profile updated.",
+    "deleted": "Profile deleted.",
+    "notFound": "Profile not found",
+    "alreadyExists": "A profile with this name already exists."
+  },
+  "cache": {
+    "cleared": "Cache cleared."
+  },
+  "trino": {
+    "deactivated": "Trino deactivated"
+  }
+}

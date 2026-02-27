@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AskDB Studio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗄️</text></svg>">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="style.css?v=1.0.1" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <script>
+    if (!localStorage.getItem('isLoggedIn')) window.location.href = 'login.html';
+    if (localStorage.getItem('theme') === 'light') document.documentElement.classList.add('light');
+  </script>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ============ LEFT SIDEBAR: Schema Tree ============ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1><i class="fas fa-database"></i> <span class="text-gradient">AskDB</span></h1>
+      <div class="subtitle" data-i18n="sidebar.subtitle">Dogal Dil ile Veritabani Sorgulama</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-header">
+        <div class="sidebar-section-title" data-i18n="sidebar.tables">Tablolar</div>
+        <button class="btn-refresh-schema" onclick="loadSchema()" data-i18n-title="common.refresh" title="Yenile">
+          <i class="fas fa-sync-alt"></i>
+        </button>
+      </div>
+      <div id="selectedTablesBanner" class="selected-tables-banner"></div>
+      <div id="schemaLoading" class="schema-loading" style="display:none;">
+        <i class="fas fa-circle-notch fa-spin"></i> <span data-i18n="common.loading">Yukleniyor...</span>
+      </div>
+      <div id="schemaTree" class="schema-tree"></div>
+    </div>
+
+    <!-- Favoriler Bolumu -->
+    <div class="sidebar-section favorites-section">
+      <div class="sidebar-section-header favorites-toggle" onclick="toggleFavoritesPanel()">
+        <div class="sidebar-section-title">
+          <i class="fas fa-star" style="color:var(--accent-warning);"></i> <span data-i18n="sidebar.favorites">Favoriler</span>
+          <span class="history-badge" id="favoritesBadge" style="display:none;">0</span>
+        </div>
+        <button class="btn-fav-toggle" id="favToggleBtn" data-i18n-title="schema.openClose" title="Ac/Kapat">
+          <i class="fas fa-chevron-up"></i>
+        </button>
+      </div>
+      <div id="favoritesList" class="favorites-list"></div>
+    </div>
+
+    <!-- Raporlar Bolumu -->
+    <div class="sidebar-section reports-section">
+      <div class="sidebar-section-header reports-toggle" onclick="toggleReportsPanel()">
+        <div class="sidebar-section-title">
+          <i class="fas fa-clipboard-list" style="color:var(--accent-primary);"></i> <span data-i18n="sidebar.reports">Raporlar</span>
+          <span class="history-badge" id="reportsBadge" style="display:none;">0</span>
+        </div>
+        <button class="btn-fav-toggle" id="reportToggleBtn" data-i18n-title="schema.openClose" title="Ac/Kapat">
+          <i class="fas fa-chevron-up"></i>
+        </button>
+      </div>
+      <div id="reportsList" class="reports-list"></div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div>
+          <div class="user-name" id="userName">admin</div>
+          <div class="user-role" id="userRole">Admin</div>
+        </div>
+      </div>
+      <div class="sidebar-actions">
+        <button class="btn-lang" onclick="I18n.setLang(I18n.getLang()==='tr'?'en':'tr')" title="TR/EN" style="font-size:0.65rem;padding:2px 6px;border-radius:6px;border:1px solid var(--border-color);background:none;color:var(--text-muted);cursor:pointer;">TR/EN</button>
+        <button class="btn-theme" onclick="toggleTheme()" id="themeToggleBtn" data-i18n-title="common.darkLight" title="Dark/Light">
+          <i class="fas fa-moon"></i>
+        </button>
+        <button class="btn-logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i></button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN CONTENT (Center) ============ -->
+  <main class="main-content">
+    <div class="main-header main-header-compact">
+      <button class="panel-toggle active" id="toggleSidebar" onclick="toggleSidebar()" title="Schema paneli">
+        <i class="fas fa-database"></i>
+      </button>
+      <div id="connDot" style="display:none;"></div>
+      <span id="connText" style="display:none;"></span>
+      <span id="dbBadge" class="db-badge"></span>
+      <div style="flex:1"></div>
+      <div class="query-timer" id="queryTimer" style="display:none;">
+        <i class="fas fa-stopwatch"></i>
+        <span id="queryTimerValue">0.00s</span>
+      </div>
+      <button class="panel-toggle" id="clearResultsBtn" onclick="clearResults()" data-i18n-title="results.clearResults" title="Sonuclari temizle" style="display:none;">
+        <i class="fas fa-eraser"></i> <span data-i18n="results.clear">Temizle</span>
+      </button>
+      <button class="panel-toggle active" id="toggleChat" onclick="toggleChatPanel()" title="Sorgu paneli">
+        <i class="fas fa-comments"></i>
+      </button>
+    </div>
+
+    <div class="workspace">
+      <!-- Preview Banner -->
+      <div id="previewBanner" class="preview-banner" style="display:none;">
+        <i class="fas fa-table" style="color:var(--accent-primary);font-size:0.85rem;"></i>
+        <div class="preview-banner-text">
+          <span id="previewTableName"></span>
+          <span id="previewRowInfo"></span>
+        </div>
+        <button class="btn-sm" onclick="closePreview()"><i class="fas fa-times"></i> <span data-i18n="common.close">Kapat</span></button>
+      </div>
+
+      <!-- Truncated Warning -->
+      <div id="truncatedWarning" class="truncated-warning" style="display:none;">
+        <i class="fas fa-exclamation-triangle"></i> <span data-i18n="results.truncatedWarning">Sonuclar kisitlandi. Tum veriyi gormek icin sorgunuzu daraltin.</span>
+      </div>
+
+      <!-- Empty State -->
+      <div class="center-empty-state" id="emptyState">
+        <i class="fas fa-comments"></i>
+        <h3 data-i18n="emptyState.title">Sormak istediginiz bir sey var mi?</h3>
+        <p data-i18n="emptyState.description">Sag paneldeki sohbet kutusundan dogal dilde soru sorun veya soldaki tablolardan birini tiklayin.</p>
+      </div>
+
+      <div id="errorBox" class="error-box"></div>
+
+      <!-- Skeleton Loading -->
+      <div class="skeleton-area" id="skeletonArea" style="display:none;">
+        <div class="skeleton-panel">
+          <div class="skeleton-header"><div class="skeleton-bar" style="width:80px;"></div></div>
+          <div class="skeleton-body">
+            <div class="skeleton-bar" style="width:90%;"></div>
+            <div class="skeleton-bar" style="width:60%;"></div>
+          </div>
+        </div>
+        <div class="skeleton-panel">
+          <div class="skeleton-header"><div class="skeleton-bar" style="width:60px;"></div></div>
+          <div class="skeleton-body">
+            <div class="skeleton-row"><div class="skeleton-cell" style="width:25%;"></div><div class="skeleton-cell" style="width:25%;"></div><div class="skeleton-cell" style="width:25%;"></div></div>
+            <div class="skeleton-row"><div class="skeleton-cell" style="width:30%;"></div><div class="skeleton-cell" style="width:20%;"></div><div class="skeleton-cell" style="width:28%;"></div></div>
+            <div class="skeleton-row"><div class="skeleton-cell" style="width:22%;"></div><div class="skeleton-cell" style="width:26%;"></div><div class="skeleton-cell" style="width:24%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="results-area" id="resultsArea" style="display:none;">
+
+        <!-- SQL Panel -->
+        <div class="result-panel" id="sqlSection">
+          <div class="panel-header">
+            <span class="panel-title"><i class="fas fa-code icon-sql"></i> <span data-i18n="sql.title">SQL Sorgusu</span></span>
+            <div class="panel-actions">
+              <button class="btn-sm" onclick="toggleFavorite()" id="favBtn" data-i18n-title="favorites.add" title="Favorilere ekle">
+                <i class="far fa-star"></i>
+              </button>
+              <button class="btn-sm" onclick="copySQL()"><i class="fas fa-copy"></i> <span data-i18n="sql.copy">Kopyala</span></button>
+              <button class="btn-sm" onclick="toggleSqlEdit()" id="sqlEditBtn"><i class="fas fa-edit"></i> <span data-i18n="sql.edit">Duzenle</span></button>
+              <button class="btn-sm btn-run-edit" onclick="executeEditedSQL()" id="sqlRunEditBtn" style="display:none;">
+                <i class="fas fa-play"></i> <span data-i18n="sql.run">Calistir</span>
+              </button>
+            </div>
+          </div>
+          <div class="sql-output" id="sqlOutput"></div>
+          <textarea class="sql-edit-area" id="sqlEditArea" style="display:none;" spellcheck="false" data-i18n-placeholder="sql.placeholder" placeholder="SQL sorgunuzu buraya yazin..."></textarea>
+        </div>
+
+        <!-- Table Panel -->
+        <div class="result-panel" id="tableSection">
+          <div class="panel-header">
+            <span class="panel-title"><i class="fas fa-table icon-table"></i> <span data-i18n="results.title">Sonuclar</span></span>
+            <div class="panel-actions">
+              <button class="btn-sm btn-send-report" onclick="openReportModal()" id="sendReportBtn" style="display:none;">
+                <i class="fas fa-paper-plane"></i> <span data-i18n="report.sendToReport">Rapora Gonder</span>
+              </button>
+              <div class="export-dropdown-wrapper">
+                <button class="btn-sm" onclick="toggleExportMenu()">
+                  <i class="fas fa-download"></i> <span data-i18n="export.title">Disari Aktar</span>
+                </button>
+                <div class="export-dropdown" id="exportDropdown">
+                  <button onclick="exportCSV()"><i class="fas fa-file-csv"></i> <span data-i18n="export.csv">CSV</span></button>
+                  <button onclick="exportExcel()"><i class="fas fa-file-excel"></i> <span data-i18n="export.excel">Excel (.xlsx)</span></button>
+                  <button onclick="exportJSON()"><i class="fas fa-file-code"></i> <span data-i18n="export.json">JSON</span></button>
+                  <button onclick="exportPDF()"><i class="fas fa-file-pdf"></i> <span data-i18n="export.pdf">PDF</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="table-toolbar" id="tableToolbar" style="display:none;">
+            <div class="table-search">
+              <i class="fas fa-search"></i>
+              <input type="text" id="tableSearchInput" data-i18n-placeholder="results.searchTable" placeholder="Tabloda ara...">
+            </div>
+            <div class="column-toggle-wrapper">
+              <button class="btn-sm" id="columnToggleBtn" onclick="toggleColumnDropdown()">
+                <i class="fas fa-columns"></i> <span data-i18n="results.columns">Sutunlar</span>
+              </button>
+              <div class="column-dropdown" id="columnDropdown"></div>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <div id="resultContainer"></div>
+          </div>
+          <div class="row-count" id="rowCount"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============ RIGHT PANEL: Chat ============ -->
+  <aside class="chat-panel" id="chatPanel">
+    <div class="chat-panel-header">
+      <div class="chat-panel-title">
+        <i class="fas fa-comments"></i> <span data-i18n="query.panelTitle">Sorgular</span>
+        <span class="history-badge" id="historyBadge" style="display:none;">0</span>
+      </div>
+      <div class="chat-panel-actions">
+        <button class="btn-clear-chat" onclick="clearHistory()" data-i18n-title="query.clearAll" title="Tumunu temizle">
+          <i class="fas fa-trash-alt"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="chatMessages"></div>
+
+    <!-- Typing Indicator -->
+    <div class="typing-indicator" id="typingIndicator">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <span class="typing-step" id="typingStep"></span>
+    </div>
+
+    <!-- Chat Input -->
+    <div class="chat-input-area">
+      <div class="chat-suggestions" id="chatSuggestions">
+        <span class="chip" data-chip="popular" onclick="fillQuery(t('query.chipPopularQuery'))" data-i18n="query.chipPopular">Populer Urunler</span>
+        <span class="chip" data-chip="topcust" onclick="fillQuery(t('query.chipTopCustomersQuery'))" data-i18n="query.chipTopCustomers">Top Musteriler</span>
+        <span class="chip" data-chip="recent" onclick="fillQuery(t('query.chipRecentOrdersQuery'))" data-i18n="query.chipRecentOrders">Son Siparisler</span>
+      </div>
+      <div class="chat-input-row">
+        <textarea id="queryInput" rows="2" data-i18n-placeholder="query.placeholder" placeholder="Soru sorun... (Enter ile gonderin)"></textarea>
+        <button class="chat-send-btn" id="runBtn" data-i18n-title="query.sendTitle" title="Gonder">
+          <i class="fas fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- Report Send Modal -->
+<div class="modal-overlay" id="reportModal" style="display:none;">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3><i class="fas fa-paper-plane"></i> <span data-i18n="report.sendToReport">Rapora Gonder</span></h3>
+      <button class="modal-close" onclick="closeReportModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <label data-i18n="report.title">Rapor Basligi</label>
+        <input type="text" id="reportTitle" data-i18n-placeholder="report.titlePlaceholder" placeholder="Orn: Aylik Satis Raporu" maxlength="200">
+      </div>
+      <div class="modal-field">
+        <label data-i18n="report.assignee">Gonderilecek Kisi</label>
+        <select id="reportAssignee">
+          <option value="" data-i18n="report.assigneeLoading">Yukleniyor...</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label data-i18n="report.note">Not (opsiyonel)</label>
+        <textarea id="reportNote" rows="2" data-i18n-placeholder="report.notePlaceholder" placeholder="Rapor hakkinda kisa not..." maxlength="500"></textarea>
+      </div>
+      <div class="modal-info">
+        <i class="fas fa-info-circle"></i>
+        <span id="reportDataInfo">0 satir, 0 sutun</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeReportModal()" data-i18n="common.cancel">Iptal</button>
+      <button class="btn-primary" onclick="sendReport()" id="sendReportSubmit">
+        <i class="fas fa-paper-plane"></i> <span data-i18n="common.send">Gonder</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="js/i18n.js?v=1.0.1"></script>
+<script src="js/store.js?v=1.0.1"></script>
+<script src="js/helpers.js?v=1.0.1"></script>
+<script src="js/theme.js?v=1.0.1"></script>
+<script src="js/schema-tree.js?v=1.0.1"></script>
+<script src="js/favorites.js?v=1.0.1"></script>
+<script src="js/chat-history.js?v=1.0.1"></script>
+<script src="js/table.js?v=1.0.1"></script>
+<script src="js/export.js?v=1.0.1"></script>
+<script src="js/sql-edit.js?v=1.0.1"></script>
+<script src="js/report-send.js?v=1.0.1"></script>
+<script src="js/report-list.js?v=1.0.1"></script>
+<script src="js/ws-progress.js?v=1.0.1"></script>
+<script src="js/app.js?v=1.0.1"></script>
+</body>
+</html>

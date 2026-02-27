@@ -1,0 +1,70 @@
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ========================
+# Virtual Environment
+# ========================
+.venv/
+venv/
+env/
+
+# ========================
+# Environment / Secrets
+# ========================
+.env
+.env.*
+!.env.example
+
+# ========================
+# Claude Code (AI tooling)
+# ========================
+.claude/
+
+# ========================
+# Testing / Cache
+# ========================
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ========================
+# IDE / Editor
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ========================
+# OS
+# ========================
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ========================
+# ML Model Artifacts
+# ========================
+ml_models/
+
+# ========================
+# Legacy test scripts (root level)
+# ========================
+/test_api.py
+/test_query.py
+
+# ========================
+# Misc
+# ========================
+*.log
+*.sqlite3
