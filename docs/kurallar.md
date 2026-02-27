@@ -52,5 +52,5 @@
 ## Iletisim
 
 - **Kod tartismasi**: GitHub PR yorumlari
-- **Genel iletisim**: Takim kanali (belirlenecek)
+- **Genel iletisim**: Takim kanali (WhatsApp)
 - **Kanban board**: https://github.com/users/mmehmetisik/projects/5
