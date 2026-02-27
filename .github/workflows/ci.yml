@@ -1,0 +1,41 @@
+# =============================================
+# AskDB — CI Pipeline
+# =============================================
+# Her push ve PR'da otomatik olarak calisir.
+# Testleri calistirir, basarisiz olursa PR merge edilemez.
+# =============================================
+
+name: CI — Tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          # Test icin minimal env degiskenleri
+          JWT_SECRET: test-secret-key-for-ci-only
+          DATABASE_URL: sqlite:///test.db
+          GROQ_API_KEY: fake-key-for-test
+          POSTGRES_URL: sqlite:///test.db
+        run: pytest tests/ -v --tb=short

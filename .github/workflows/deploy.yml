@@ -1,0 +1,59 @@
+# =============================================
+# AskDB — Manuel Deploy
+# =============================================
+# Sadece GitHub'da "Run workflow" butonuna basildiginda calisir.
+# Otomatik deploy YOKTUR — kontrol tamamen sendedir.
+# =============================================
+
+name: Deploy — Railway
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Hedef ortam"
+        required: true
+        default: "production"
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests before deploy
+        env:
+          JWT_SECRET: test-secret-key-for-ci-only
+          DATABASE_URL: sqlite:///test.db
+          GROQ_API_KEY: fake-key-for-test
+          POSTGRES_URL: sqlite:///test.db
+        run: pytest tests/ -v --tb=short
+
+      - name: Deploy to Railway
+        if: success()
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "=== Deploy to ${{ inputs.environment }} ==="
+          # Railway CLI kurulumu ve deploy
+          # Bu adim Railway hesabi olusturulduktan sonra aktif edilecek
+          # npm install -g @railway/cli
+          # railway up --detach
+          echo "Railway deploy adimi henuz yapilandirilmadi."
+          echo "Madde 3'te aktif edilecek."
