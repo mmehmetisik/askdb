@@ -17,7 +17,6 @@ on:
         type: choice
         options:
           - production
-          - staging
 
 jobs:
   deploy:
@@ -45,15 +44,15 @@ jobs:
           POSTGRES_URL: sqlite:///test.db
         run: pytest tests/ -v --tb=short
 
+      - name: Install Railway CLI
+        if: success()
+        run: npm install -g @railway/cli
+
       - name: Deploy to Railway
         if: success()
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          echo "=== Deploy to ${{ inputs.environment }} ==="
-          # Railway CLI kurulumu ve deploy
-          # Bu adim Railway hesabi olusturulduktan sonra aktif edilecek
-          # npm install -g @railway/cli
-          # railway up --detach
-          echo "Railway deploy adimi henuz yapilandirilmadi."
-          echo "Madde 3'te aktif edilecek."
+          echo "=== Deploying to ${{ inputs.environment }} ==="
+          railway up --service askdb-web --detach
+          echo "=== Deploy triggered successfully ==="
