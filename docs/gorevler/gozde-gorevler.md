@@ -2,7 +2,7 @@
 
 **Rol**: Scrum Master + Data Scientist
 **GitHub**: @gkizilkaya
-**Sprint**: 1 (1-7 Mart 2026)
+**Sprint**: 1 (1-4 Mart 2026)
 
 ---
 

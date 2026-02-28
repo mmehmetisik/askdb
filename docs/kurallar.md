@@ -62,6 +62,28 @@ feature/* ← Takim uyelerinin calistigi branch'ler.
 - Gozde sorgu listelerini karsilastirip tekrar olmadigini kontrol eder
 - Onaylanan sorgu listesi degistirilemez (ek sorgular eklenebilir)
 
+## Test Sonuclari ve Rapor Dokumantasyonu
+
+> **ONEMLI**: Modul dokumantasyonu ile test raporu **farkli seylerdir**.
+> - **Modul dokumani** = Kod ne yapar (teknik referans, `docs/moduller/` altina)
+> - **Test raporu** = Ne bulduk, ne calisiyor, ne calismiyor (bulgular, `docs/raporlar/` altina)
+
+Test sonuclarini raporlamak icin `docs/sablonlar/` altindaki sablonlari kullanin:
+
+| Sablon | Ne Icin |
+|--------|---------|
+| `sql-test-sonuclari-sablon.md` | 100 SQL sorgu test sonuclari |
+| `bug-raporu-sablon.md` | Bulunan hatalar |
+| `test-raporu-sablon.md` | Analysis/ML testi, log analizi, UI/UX onerileri |
+
+**Kullanim**: Sablonu kopyalayin, kendi adinizla doldurun, PR ile gonderin.
+Sablonlarda ufak tefek degisiklikler yapabilirsiniz, ancak temel yapi ve tablo formatini koruyun.
+
+**Dosya isimlendirme**: `docs/raporlar/isim-soyisim-rapor-turu.md`
+- Ornek: `docs/raporlar/onur-karagoz-sql-test-sonuclari.md`
+- Ornek: `docs/raporlar/gamze-gundogdu-bug-raporu.md`
+- Ornek: `docs/raporlar/havva-cecen-test-raporu.md`
+
 ## Commit Mesaji Kurallari
 
 - Kisa ve aciklayici yaz (Ingilizce veya Turkce)
@@ -72,10 +94,11 @@ feature/* ← Takim uyelerinin calistigi branch'ler.
 
 ## Sprint Bilgileri
 
-- **Sprint suresi**: 1 hafta (Pazar - Cumartesi)
+- **Sprint suresi**: 4 gun
+- **Sprint 1**: 1 Mart - 4 Mart 2026 (Pazar - Carsamba)
 - **Sprint 1 baslangic**: 1 Mart 2026, 09:00
 - **Daily standup**: Her gun saat 09:00 (Scrum Master koordine eder)
-- **Sprint review**: Her Cumartesi
+- **Sprint review**: 4 Mart 2026 Carsamba (son gun)
 
 ## Takim Yapisi
 
