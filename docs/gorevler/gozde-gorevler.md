@@ -16,10 +16,20 @@
 
 ### 1.2 PR Review
 - Tum takim uyelerinin PR'larini ilk sen review et
+- PR'lar **develop** branch'ine acilmali — master'a acan PR'lari reddet
 - Review sonrasi PO (Mehmet) onayina yonlendir
 - PR'larda kod kalitesi, commit mesaji ve dokumantasyon kontrolu yap
 
-### 1.3 Iletisim
+### 1.3 SQL Sorgu Listesi Onayi (KRITIK)
+- **Takim uyeleri teste baslamadan once** sorgu listelerini sana gonderecek
+- Sorgu listelerini incele ve karsilastir:
+  - Her kisinin sorgulari birbirinden **farkli** olmali
+  - Ayni veya benzer sorgular varsa reddedip yeniden yazdir
+  - Farkli tablolar, farkli senaryolar, farkli zorluk seviyeleri olmali
+- **Sen onaylamadan kimse teste baslamaz**
+- Onaylanan sorgu listesi degistirilemez
+
+### 1.4 Iletisim
 - Takim uyelerinin ilk basvuru noktasi sensin
 - Sorun/engel varsa once sana bildirilecek
 - Gerekirse PO'ya eskale et
@@ -27,6 +37,10 @@
 ---
 
 ## 2. SQL Sorgu Testi (100 Sorgu)
+
+> **ONEMLI**: Senin sorgularin diger takim uyelerinden **tamamen farkli** olmali.
+> Ayni veya benzer sorgular kabul edilmez. Farkli tablolar, farkli senaryolar sec.
+> Sorgu listeni hazirladiktan sonra — sen SM olarak kendi listeni PO'ya (Mehmet) onaylat.
 
 ### 2.1 Tek Veritabani Sorgulari (50 adet)
 - AskDB uzerinden 50 farkli dogal dil sorusu sor

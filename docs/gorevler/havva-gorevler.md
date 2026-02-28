@@ -30,6 +30,10 @@
 
 ## 2. SQL Sorgu Testi (100 Sorgu)
 
+> **ONEMLI**: Senin sorgularin diger takim uyelerinden **tamamen farkli** olmali.
+> Ayni veya benzer sorgular kabul edilmez. Farkli tablolar, farkli senaryolar sec.
+> **TESTE BASLAMADAN ONCE** sorgu listeni Scrum Master'a (Gozde) onaylat. Onay almadan teste baslanmaz.
+
 ### 2.1 Tek Veritabani Sorgulari (50 adet)
 - AskDB uzerinden 50 farkli dogal dil sorusu sor
 - PostgreSQL (Supabase) uzerinde calistir

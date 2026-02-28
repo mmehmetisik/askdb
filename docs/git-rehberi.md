@@ -2,7 +2,7 @@
 
 ---
 
-## !! MASTER BRANCH'E DIREKT PUSH YAPILMAZ !!
+## !! MASTER VE DEVELOP BRANCH'LERE DIREKT PUSH YAPILMAZ !!
 
 ## !! BU KURALA UYMAYAN COMMIT REVERT EDILIR !!
 
@@ -41,9 +41,9 @@ pytest tests/ -v
 ## 2. Yeni Gorev Baslatma
 
 ```bash
-# Once master'i guncelle
-git checkout master
-git pull origin master
+# Once develop'u guncelle (MASTER'DAN DEGIL, DEVELOP'DAN!)
+git checkout develop
+git pull origin develop
 
 # Yeni branch olustur (gorev adini yaz)
 git checkout -b feature/gorev-adi
@@ -53,6 +53,8 @@ git checkout -b feature/gorev-adi
 # git checkout -b fix/cache-ttl-bug
 # git checkout -b docs/auth-service-md
 ```
+
+> **DIKKAT**: Branch'inizi her zaman **develop**'dan acin, master'dan degil!
 
 ### Branch Isimlendirme Kurallari
 
@@ -88,24 +90,27 @@ git push
 
 1. GitHub'a git: https://github.com/mmehmetisik/askdb
 2. Sari banner gorunur: **"Compare & pull request"** butonuna tikla
-3. Bilgileri doldur:
+3. **ONEMLI**: PR'in hedef branch'inin **develop** oldugunu kontrol et!
+   - Dogru: `feature/gorev-adi` → `develop`
+   - **YANLIS**: `feature/gorev-adi` → `master` (BUNU YAPMAYIN!)
+4. Bilgileri doldur:
    - **Title**: Kisa aciklama (ornek: "Add ML engine documentation")
    - **Description**: Ne yaptin, neden yaptin
-4. Sag taraftan:
+5. Sag taraftan:
    - **Reviewers**: `gkizilkaya` (Scrum Master) ekle
    - **Assignees**: Kendini ekle
-5. **"Create pull request"** tikla
-6. Testlerin gecmesini bekle (yesil tik)
-7. Scrum Master review edecek → PO onaylayacak → merge edilecek
+6. **"Create pull request"** tikla
+7. Testlerin gecmesini bekle (yesil tik)
+8. Scrum Master review edecek → PO onaylayacak → merge edilecek (develop'a)
 
 ## 5. PR Onaylandiktan Sonra
 
 ```bash
-# Master'a geri don
-git checkout master
+# develop'a geri don
+git checkout develop
 
 # Guncellemeleri cek
-git pull origin master
+git pull origin develop
 
 # Eski branch'i sil (opsiyonel)
 git branch -d feature/gorev-adi
@@ -126,8 +131,8 @@ git branch
 # Branch degistir
 git checkout branch-adi
 
-# Master'dan guncellemeleri al (kendi branch'indeyken)
-git pull origin master
+# develop'dan guncellemeleri al (kendi branch'indeyken)
+git pull origin develop
 
 # Son commit'leri gor
 git log --oneline -5
@@ -135,12 +140,12 @@ git log --oneline -5
 
 ## 7. Sorun Giderme
 
-### "Your branch is behind 'origin/master'"
+### "Your branch is behind 'origin/develop'"
 ```bash
-git checkout master
-git pull origin master
+git checkout develop
+git pull origin develop
 git checkout feature/gorev-adi
-git merge master
+git merge develop
 ```
 
 ### Yanlis branch'e commit ettim
