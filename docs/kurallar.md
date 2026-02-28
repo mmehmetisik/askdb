@@ -15,7 +15,8 @@
 3. **GitHub'da PR (Pull Request) ac** → testlerin gecmesini bekle
 4. **Scrum Master (Gozde)** PR'i review eder, onaylar veya yorum yazar
 5. **Product Owner (Mehmet)** final onay verir
-6. **Merge** edilir → master'a girer → Railway otomatik deploy eder
+6. **Merge** edilir → master'a girer
+7. **Deploy** → Sadece PO (Mehmet) tetikler (asagidaki Deploy Kurallari'na bak)
 
 ## Dokumantasyon Kurallari
 
@@ -48,6 +49,23 @@
 | **Havva CECEN** | Data Engineer | @havvacecen |
 | **Gamze GUNDOGDU** | AI/ML/Analysis Developer | @gamzegndgd |
 | **Onur KARAGOZ** | Full-stack Developer | @OnurKaragozZ |
+
+## Canli Ortam
+
+- **Uygulama**: https://askdb-web-production.up.railway.app
+- **Health Check**: https://askdb-web-production.up.railway.app/api/health
+- **Platform**: Railway
+
+## Deploy Kurallari
+
+> **DEPLOY SADECE PRODUCT OWNER (MEHMET) TARAFINDAN TETIKLENIR.**
+> **HICBIR TAKIM UYESI DEPLOY YAPMAZ, YAPAMAZ.**
+
+- Deploy, GitHub Actions uzerinden **manuel** tetiklenir (workflow_dispatch)
+- Scrum Master (Gozde) PR'lari review edip onaylamadan deploy olmaz
+- PO (Mehmet) final onay verdikten sonra deploy tetikler
+- Akis: **PR onay (SM) → Final onay (PO) → Merge → Deploy (PO tetikler)**
+- Sorun/acil durum varsa once Scrum Master'a bildir, SM PO'ya eskale eder
 
 ## Iletisim
 
