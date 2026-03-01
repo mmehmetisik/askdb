@@ -156,27 +156,48 @@ SQL: SELECT * FROM <tablo> WHERE <metin_sutunu> ILIKE '%arama_kelimesi%';
 
 
 async def build_dynamic_schema() -> str:
-    """Veritabanindan dinamik schema bilgisi olustur."""
+    """Veritabanindan dinamik schema bilgisi olustur.
+
+    Text/varchar sutunlar icin kategorik deger profili de eklenir.
+    Ornek: status VARCHAR  -- values: 'Aktif', 'Kapali', 'Gecikmiş'
+    Bu sayede LLM gercek degerleri gorup dogru WHERE kosullari yazar.
+    """
     global DYNAMIC_SCHEMA
     try:
-        from backend.sql.execution.database import get_schema_info
+        from backend.sql.execution.database import get_schema_info, profile_column_values
         tables = await get_schema_info()
         if not tables:
             return SCHEMA_INFO  # Fallback to static
 
+        # Profile categorical columns (text/varchar with <= 25 distinct values)
+        profiles: dict[str, dict[str, list[str]]] = {}
+        try:
+            profiles = await profile_column_values(tables)
+        except Exception as e:
+            logger.warning(f"[SCHEMA] Value profiling failed (schema still usable): {e}")
+
         lines = []
         for table in tables:
             cols = []
+            tbl_name = table.get("full_name") or table["name"]
+            tbl_profile = profiles.get(tbl_name, {})
+
             for col in table["columns"]:
                 pk = " PRIMARY KEY" if col.get("is_pk") else ""
                 nullable = "" if col.get("nullable") else " NOT NULL"
-                cols.append(f"  {col['name']} {col['type'].upper()}{pk}{nullable}")
-            # Trino modunda catalog.schema.table formati kullan
-            tbl_name = table.get("full_name") or table["name"]
+                col_line = f"  {col['name']} {col['type'].upper()}{pk}{nullable}"
+                # Add value annotation for categorical columns
+                if col["name"] in tbl_profile:
+                    vals = tbl_profile[col["name"]]
+                    val_str = ", ".join(f"'{v}'" for v in vals)
+                    col_line += f"  -- values: {val_str}"
+                cols.append(col_line)
+
             lines.append(f"CREATE TABLE {tbl_name} (\n" + ",\n".join(cols) + "\n);")
 
         DYNAMIC_SCHEMA = "\n\n".join(lines)
-        logger.info(f"[SCHEMA] Dynamic schema built ({len(tables)} tables)")
+        profiled = sum(len(v) for v in profiles.values())
+        logger.info(f"[SCHEMA] Dynamic schema built ({len(tables)} tables, {profiled} profiled columns)")
         return DYNAMIC_SCHEMA
     except Exception as e:
         logger.warning(f"[SCHEMA] Dynamic schema build failed, using static: {e}")

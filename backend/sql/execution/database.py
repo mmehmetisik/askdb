@@ -269,6 +269,92 @@ async def get_schema_info() -> list:
     return result
 
 
+# =================== COLUMN VALUE PROFILING ===================
+
+_TEXT_TYPES = frozenset({
+    "character varying", "varchar", "text", "nvarchar", "char", "nchar",
+    "character", "enum", "set", "ntext", "longtext", "mediumtext", "tinytext",
+})
+
+
+async def profile_column_values(schema_info: list, max_distinct: int = 25) -> dict:
+    """Profile text/varchar columns to discover categorical values for LLM context.
+
+    Returns: {table_full_name: {col_name: [val1, val2, ...]}}
+    Only includes columns with <= max_distinct unique non-null values.
+    """
+    profiles: dict[str, dict[str, list[str]]] = {}
+
+    for table in schema_info:
+        tbl_full = table.get("full_name") or table["name"]
+        tbl_name = table["name"]
+        text_cols = [c["name"] for c in table["columns"]
+                     if c["type"].lower() in _TEXT_TYPES]
+        if not text_cols:
+            continue
+
+        # Resolve adapter for this table
+        try:
+            adapter = await resolve_adapter_for_tables([tbl_full])
+        except Exception:
+            continue
+
+        dialect = adapter.dialect()
+        table_profiles: dict[str, list[str]] = {}
+
+        for col_name in text_cols:
+            try:
+                sql = _build_distinct_sql(
+                    dialect, tbl_name, col_name, max_distinct + 1, table,
+                )
+                rows = await adapter.fetch(sql)
+                values = []
+                for r in rows:
+                    v = list(r.values())[0] if isinstance(r, dict) else r[0]
+                    if v is not None:
+                        values.append(str(v))
+
+                if len(values) <= max_distinct and values:
+                    table_profiles[col_name] = sorted(values)
+            except Exception as e:
+                logger.debug(f"[PROFILE] {tbl_full}.{col_name}: {e}")
+                continue
+
+        if table_profiles:
+            profiles[tbl_full] = table_profiles
+
+    profiled_count = sum(len(v) for v in profiles.values())
+    if profiled_count:
+        logger.info(f"[PROFILE] {profiled_count} categorical columns profiled across {len(profiles)} tables")
+    return profiles
+
+
+def _build_distinct_sql(dialect: str, table_name: str, col_name: str,
+                        limit: int, table_meta: dict) -> str:
+    """Build dialect-specific SELECT DISTINCT query."""
+    if dialect == "postgresql":
+        return (f'SELECT DISTINCT "{col_name}" FROM "{table_name}" '
+                f'WHERE "{col_name}" IS NOT NULL ORDER BY "{col_name}" LIMIT {limit}')
+    elif dialect == "mysql":
+        return (f"SELECT DISTINCT `{col_name}` FROM `{table_name}` "
+                f"WHERE `{col_name}` IS NOT NULL ORDER BY `{col_name}` LIMIT {limit}")
+    elif dialect == "mssql":
+        return (f"SELECT DISTINCT TOP {limit} [{col_name}] FROM [{table_name}] "
+                f"WHERE [{col_name}] IS NOT NULL ORDER BY [{col_name}]")
+    elif dialect == "trino":
+        catalog = table_meta.get("catalog", "")
+        schema = table_meta.get("schema", "")
+        if catalog and schema:
+            fqn = f'"{catalog}"."{schema}"."{table_name}"'
+        else:
+            fqn = f'"{table_name}"'
+        return (f'SELECT DISTINCT "{col_name}" FROM {fqn} '
+                f'WHERE "{col_name}" IS NOT NULL ORDER BY "{col_name}" LIMIT {limit}')
+    else:
+        return (f'SELECT DISTINCT "{col_name}" FROM "{table_name}" '
+                f'WHERE "{col_name}" IS NOT NULL ORDER BY "{col_name}" LIMIT {limit}')
+
+
 # =================== DIRECT-MODE MULTI-DB ADAPTERS ===================
 
 def _build_adapter_from_conn(c: dict):

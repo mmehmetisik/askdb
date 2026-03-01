@@ -20,6 +20,7 @@ async function loadSchema() {
     var data = await res.json();
     schemaData = data.tables || [];
     schemaConnections = data.connections || [];
+    _schemaTrinoActive = !!data.trino_active;
     renderSchemaTree();
   } catch (e) {
     var container = document.getElementById("schemaTree");
@@ -332,19 +333,114 @@ function toggleSchemaTable(header) {
   if (parent) parent.classList.toggle("expanded");
 }
 
+// ── Column Reference Tracking ──
+var _columnRefs = [];       // [{table, column, conn}]
+var _isColumnRefMode = false;
+var _schemaTrinoActive = false;  // Updated from /api/schema response
+
+function _getConnectionForTable(tableFqn) {
+  if (!schemaData) return "default";
+  for (var i = 0; i < schemaData.length; i++) {
+    var tbl = schemaData[i];
+    var fqn = tbl.full_name || tbl.name;
+    if (fqn === tableFqn) return tbl.catalog || "default";
+  }
+  return "default";
+}
+
+function _resetColumnRefs() {
+  _columnRefs = [];
+  _isColumnRefMode = false;
+}
+
+function _rebuildColumnRefText(input) {
+  if (_columnRefs.length === 0) { input.value = ""; return; }
+
+  // Group by table
+  var byTable = {};
+  var tableOrder = [];
+  _columnRefs.forEach(function (ref) {
+    if (!byTable[ref.table]) { byTable[ref.table] = []; tableOrder.push(ref.table); }
+    byTable[ref.table].push(ref.column);
+  });
+
+  var andWord = t("schema.columnRefAnd");
+  var parts = [];
+  tableOrder.forEach(function (tbl) {
+    var cols = byTable[tbl];
+    var colText;
+    if (cols.length === 1) {
+      colText = cols[0];
+    } else if (cols.length === 2) {
+      colText = cols[0] + andWord + cols[1];
+    } else {
+      colText = cols.slice(0, -1).join(", ") + andWord + cols[cols.length - 1];
+    }
+    parts.push(t("schema.columnRefMulti", { table: tbl, columns: colText }));
+  });
+
+  if (parts.length === 1) {
+    input.value = parts[0];
+  } else {
+    input.value = parts.join(andWord.trim() === "ve" ? " ve " : " and ");
+  }
+}
+
 function insertColumnRef(table, column) {
   var input = document.getElementById("queryInput");
   if (!input) return;
 
-  if (!input.value.trim()) {
-    input.value = t("schema.columnRef", {table: table, column: column});
+  var conn = _getConnectionForTable(table);
+
+  // Cross-DB check (only in column-ref mode with existing refs)
+  if (_columnRefs.length > 0 && _isColumnRefMode) {
+    var existingConns = {};
+    _columnRefs.forEach(function (r) { existingConns[r.conn] = true; });
+    if (!existingConns[conn]) {
+      // Different DB — check Trino
+      if (!_schemaTrinoActive) {
+        _showCrossDbToast();
+        return;
+      }
+    }
+    // Check duplicate
+    var dup = _columnRefs.some(function (r) { return r.table === table && r.column === column; });
+    if (dup) return;
+  }
+
+  if (!input.value.trim() || _isColumnRefMode) {
+    if (!_isColumnRefMode) {
+      // First click — start ref mode
+      _columnRefs = [];
+      _isColumnRefMode = true;
+    }
+    _columnRefs.push({ table: table, column: column, conn: conn });
+    _rebuildColumnRefText(input);
   } else {
+    // User has typed manually — just append with space separator
     var pos = input.selectionStart || input.value.length;
     var before = input.value.substring(0, pos);
     var after = input.value.substring(pos);
-    input.value = before + column + after;
+    var sep = before.endsWith(" ") ? "" : " ";
+    input.value = before + sep + column + after;
   }
   input.focus();
+  if (typeof _autoResizeInput === "function") _autoResizeInput();
+}
+
+function _showCrossDbToast() {
+  var msg = t("schema.crossDbWarning");
+  // Use existing toast if available, otherwise fallback to alert-style banner
+  var existing = document.getElementById("crossDbToast");
+  if (existing) existing.remove();
+  var toast = document.createElement("div");
+  toast.id = "crossDbToast";
+  toast.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);"
+    + "background:#f59e0b;color:#000;padding:10px 20px;border-radius:8px;z-index:9999;"
+    + "font-size:0.85rem;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.3);";
+  toast.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + escapeHtml(msg);
+  document.body.appendChild(toast);
+  setTimeout(function () { if (toast.parentNode) toast.remove(); }, 3500);
 }
 
 // ── Helpers ──

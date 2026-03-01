@@ -91,7 +91,13 @@ function _autoResizeInput() {
   queryInput.style.height = "auto";
   queryInput.style.height = Math.min(queryInput.scrollHeight, 200) + "px";
 }
-queryInput.addEventListener("input", _autoResizeInput);
+queryInput.addEventListener("input", function () {
+  _autoResizeInput();
+  // Exit column-ref mode when user types manually
+  if (typeof _isColumnRefMode !== "undefined" && _isColumnRefMode) {
+    _isColumnRefMode = false;
+  }
+});
 
 // ── Main Query Handler ──
 async function runQuery() {
@@ -102,6 +108,7 @@ async function runQuery() {
   runBtn.disabled = true;
   queryInput.disabled = true;
   queryInput.value = "";
+  if (typeof _resetColumnRefs === "function") _resetColumnRefs();
   _autoResizeInput();
 
   // Clear center panel
