@@ -127,6 +127,41 @@ Guvenli SQL:"""
     return _clean_sql(response)
 
 
+async def retry_fix_sql(question: str, bad_sql: str, error_msg: str,
+                        selected_tables: list[str] | None = None) -> str:
+    """SQL calistirilirken hata alindiysa, hatayi LLM'e gosterip duzeltmesini iste."""
+    schema = get_active_schema()
+    dialect = _get_dialect_name()
+
+    table_hint = ""
+    if selected_tables:
+        table_hint = f"\nKullanicinin sectigi tablolar: {', '.join(selected_tables)}. SADECE bu tablolardaki sutunlari kullan.\n"
+
+    prompt = f"""Onceki SQL sorgun veritabaninda calistirilirken HATA aldi:
+
+SQL: {bad_sql}
+HATA: {error_msg}
+
+BU HATAYI DUZELT. Kurallar:
+- YALNIZCA asagidaki schema'daki tablo ve sutun isimlerini kullan.
+- Schema'da OLMAYAN tablo veya sutun ASLA kullanma.
+- Sadece SELECT sorgusu yaz. Aciklama yazma. Markdown kullanma.
+- Veritabani tipi: {dialect}
+{table_hint}
+[VERITABANI SEMASI]
+{schema}
+
+Kullanici sorusu: {question}
+Duzeltilmis SQL:"""
+
+    response = await _chain.generate(
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        max_tokens=512,
+    )
+    return _clean_sql(response)
+
+
 async def interpret_results(question: str, sql: str, result: list) -> str:
     """Sorgu sonucunu Turkce olarak yorumla."""
     try:

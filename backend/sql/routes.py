@@ -10,7 +10,7 @@ from backend.sql.execution.database import (
     run_sql, is_trino_active, run_sql_trino, log_query,
 )
 from backend.sql.execution.security import is_safe_sql
-from backend.sql.llm.service import generate_sql, retry_safe_sql
+from backend.sql.llm.service import generate_sql, retry_safe_sql, retry_fix_sql
 from backend.sql.cache.service import cache_key, get_cached, set_cached
 from backend.sql.rate_limit import check_rate_limit
 from backend.core.i18n import t as _t, get_lang
@@ -107,14 +107,40 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
                 "truncated": False,
             }
 
-        # Execute via Trino or direct
+        # Execute via Trino or direct (with retry on failure)
         await emit_progress(session_id, "executing", progress=80)
         use_trino = is_trino_active() and _user_has_trino(user)
-        if use_trino:
-            db_result = await run_sql_trino(sql)
-            logger.info("[TRINO] Query executed via Trino")
-        else:
-            db_result = await run_sql(sql, selected_tables=tables_filter or None)
+
+        exec_attempts = 0
+        max_exec_retries = 2
+        last_exec_error = None
+
+        while exec_attempts <= max_exec_retries:
+            try:
+                if use_trino:
+                    db_result = await run_sql_trino(sql)
+                    logger.info("[TRINO] Query executed via Trino")
+                else:
+                    db_result = await run_sql(sql, selected_tables=tables_filter or None)
+                last_exec_error = None
+                break  # Basarili
+            except Exception as exec_err:
+                exec_attempts += 1
+                last_exec_error = exec_err
+                err_name = type(exec_err).__name__
+                logger.warning(f"[SQL EXEC RETRY] attempt {exec_attempts}/{max_exec_retries} - {err_name}: {exec_err}")
+                if exec_attempts <= max_exec_retries:
+                    # LLM'den hataya gore SQL duzeltmesini iste
+                    sql = await retry_fix_sql(question, sql, f"{err_name}: {exec_err}",
+                                              selected_tables=tables_filter or None)
+                    logger.info(f"[SQL RETRY FIX] new SQL: {sql}")
+                    if not is_safe_sql(sql):
+                        logger.error(f"[SQL RETRY FIX] Retried SQL is unsafe, stopping")
+                        break
+
+        if last_exec_error:
+            raise last_exec_error
+
         result = _to_legacy_result(db_result, lang=get_lang(request))
         row_count = db_result["total_count"]
         logger.info(f"[OK] {row_count} rows returned" +
