@@ -17,6 +17,11 @@ _auth_adapter = None  # Auth adapter (always writable)
 _trino_adapter = None
 _trino_conn_id = None  # Active Trino db_connections ID
 
+# Dynamic direct-mode adapters (each db_connection gets its own adapter)
+_direct_adapters: dict = {}     # conn_id → adapter instance
+_table_conn_map: dict = {}      # table_name → conn_id
+_conn_metadata: dict = {}       # conn_id → {name, db_type, ...}
+
 # Dynamic table cache (from db_connections)
 _dynamic_tables_cache: dict = {"tables": set(), "timestamp": 0}
 _DYNAMIC_CACHE_TTL = 60  # seconds
@@ -82,12 +87,17 @@ async def init_pool():
     except Exception as e:
         logger.error(f"Table creation error: {e}")
 
+    # Initialize direct-mode adapters for each db_connection
+    if DB_MODE != "trino":
+        await init_direct_adapters()
+
     # Auto-activate Trino if an active connection exists
     await _auto_activate_trino()
 
 
 async def close_pool():
     global _adapter, _auth_adapter
+    await close_direct_adapters()
     if _adapter:
         await _adapter.close()
     if _auth_adapter and _auth_adapter is not _adapter:
@@ -119,9 +129,10 @@ async def get_auth_adapter():
 
 # =================== QUERY EXECUTION ===================
 
-async def run_sql(sql: str, limit: int | None = None) -> dict:
-    """Execute a SELECT query and return serialized results."""
-    adapter = await get_adapter()
+async def run_sql(sql: str, limit: int | None = None,
+                  selected_tables: list[str] | None = None) -> dict:
+    """Execute a SELECT query, routing to the correct adapter."""
+    adapter = await resolve_adapter_for_tables(selected_tables)
     max_rows = limit or MAX_QUERY_ROWS
     clean_sql = sql.rstrip("; \n\t")
 
@@ -216,7 +227,174 @@ async def get_schema_info() -> list:
         finally:
             cfg.ALLOWED_TABLES_BY_CATALOG = old_catalog
 
-    return await adapter.get_schema_info(all_tables)
+    # DIRECT MODE: Query each adapter for its own tables
+    # 1. Main adapter tables (those NOT in any dynamic connection)
+    main_tables = {t for t in all_tables if t not in _table_conn_map}
+    result = []
+
+    if main_tables:
+        try:
+            result.extend(await adapter.get_schema_info(main_tables))
+        except Exception as e:
+            logger.warning(f"[SCHEMA] Main adapter schema error: {e}")
+
+    # 2. Dynamic adapter tables (grouped by conn_id)
+    conn_tables: dict[int, set] = {}
+    for t in all_tables:
+        if t in _table_conn_map:
+            cid = _table_conn_map[t]
+            conn_tables.setdefault(cid, set()).add(t)
+
+    for conn_id, tables in conn_tables.items():
+        dyn_adapter = _direct_adapters.get(conn_id)
+        if not dyn_adapter:
+            logger.warning(f"[SCHEMA] No adapter for conn_id={conn_id}, skipping {len(tables)} tables")
+            continue
+        try:
+            schema_info = await dyn_adapter.get_schema_info(tables)
+            conn_name = _conn_metadata.get(conn_id, {}).get("name", f"conn_{conn_id}")
+            conn_db_type = _conn_metadata.get(conn_id, {}).get("db_type", "unknown")
+            for t_info in schema_info:
+                if not t_info.get("catalog"):
+                    t_info["catalog"] = conn_name
+                    t_info["schema"] = "public"
+                t_info["db_type"] = conn_db_type
+            result.extend(schema_info)
+        except Exception as e:
+            logger.warning(f"[SCHEMA] Dynamic adapter schema error (conn_id={conn_id}): {e}")
+
+    return result
+
+
+# =================== DIRECT-MODE MULTI-DB ADAPTERS ===================
+
+def _build_adapter_from_conn(c: dict):
+    """Build adapter from db_connections row dict."""
+    from .adapters import create_adapter
+    from urllib.parse import quote_plus
+
+    db_type = c["db_type"]
+    _pw = quote_plus(str(c["password"])) if c.get("password") else ""
+    _user = quote_plus(str(c["username"])) if c.get("username") else ""
+    ssl_enabled = bool(c.get("ssl_enabled", False))
+
+    if db_type == "postgresql":
+        ssl_suffix = "?sslmode=require" if ssl_enabled else ""
+        url = f"postgresql://{_user}:{_pw}@{c['host']}:{c['port']}/{c['database_name']}{ssl_suffix}"
+    elif db_type in ("mysql", "mariadb"):
+        url = f"mysql://{_user}:{_pw}@{c['host']}:{c['port']}/{c['database_name']}"
+    elif db_type == "mssql":
+        url = f"mssql://{_user}:{_pw}@{c['host']}:{c['port']}/{c['database_name']}"
+    else:
+        raise ValueError(f"Unsupported db_type for direct adapter: {db_type}")
+
+    adapter_type = "mysql" if db_type == "mariadb" else db_type
+    return create_adapter(adapter_type, url, ssl_enabled=ssl_enabled)
+
+
+async def init_direct_adapters():
+    """Initialize adapters for all active non-Trino db_connections (direct mode)."""
+    global _direct_adapters, _table_conn_map, _conn_metadata
+    if not _auth_adapter:
+        return
+
+    try:
+        rows = await _auth_adapter.fetch(
+            "SELECT id, name, db_type, host, port, database_name, "
+            "username, password, ssl_enabled, allowed_tables "
+            "FROM db_connections WHERE is_active = true AND db_type != 'trino'"
+        )
+    except Exception as e:
+        logger.warning(f"[DIRECT] Failed to read db_connections: {e}")
+        return
+
+    for row in rows:
+        c = row if isinstance(row, dict) else dict(row)
+        conn_id = c["id"]
+        try:
+            adapter = _build_adapter_from_conn(c)
+            await adapter.init()
+            _direct_adapters[conn_id] = adapter
+            _conn_metadata[conn_id] = {
+                "name": c["name"], "db_type": c["db_type"],
+                "host": c.get("host", ""), "database_name": c.get("database_name", ""),
+            }
+            # Map each allowed table to this connection
+            tables_str = c.get("allowed_tables") or "[]"
+            if tables_str and tables_str != "[]":
+                tables = _json.loads(tables_str)
+                for t in (tables if isinstance(tables, list) else []):
+                    _table_conn_map[t] = conn_id
+            logger.info(f"[DIRECT] Adapter initialized: {c['name']} ({c['db_type']}, id={conn_id})")
+        except Exception as e:
+            logger.warning(f"[DIRECT] Failed to init adapter for {c['name']}: {e}")
+
+
+async def close_direct_adapters():
+    """Close all dynamic direct-mode adapters."""
+    global _direct_adapters, _table_conn_map, _conn_metadata
+    for conn_id, adapter in _direct_adapters.items():
+        try:
+            await adapter.close()
+        except Exception:
+            pass
+    _direct_adapters.clear()
+    _table_conn_map.clear()
+    _conn_metadata.clear()
+
+
+async def reinit_direct_adapters():
+    """Re-initialize all direct adapters (called after admin changes)."""
+    if DB_MODE == "trino":
+        return
+    await close_direct_adapters()
+    await init_direct_adapters()
+    invalidate_dynamic_tables_cache()
+
+
+async def resolve_adapter_for_tables(selected_tables: list[str] | None = None):
+    """Determine which adapter handles the given tables.
+
+    - None or empty → main adapter
+    - All tables in one connection → that connection's adapter
+    - Tables span multiple connections → HTTP 400 error
+    """
+    if not selected_tables:
+        return await get_adapter()
+
+    conn_ids = set()
+    has_main_tables = False
+
+    for table in selected_tables:
+        if table in _table_conn_map:
+            conn_ids.add(_table_conn_map[table])
+        else:
+            has_main_tables = True
+
+    if has_main_tables and conn_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="Bu sorgu birden fazla veritabanindaki tablolari kullaniyor. "
+                   "Cross-database sorgular icin Trino modunu aktif edin.",
+        )
+    if len(conn_ids) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Bu sorgu birden fazla veritabanindaki tablolari kullaniyor. "
+                   "Cross-database sorgular icin Trino modunu aktif edin.",
+        )
+
+    if len(conn_ids) == 1:
+        conn_id = conn_ids.pop()
+        adapter = _direct_adapters.get(conn_id)
+        if not adapter:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Veritabani baglantisi hazir degil (conn_id={conn_id})",
+            )
+        return adapter
+
+    return await get_adapter()
 
 
 # =================== DYNAMIC TRINO MANAGEMENT ===================
