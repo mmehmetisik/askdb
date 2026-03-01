@@ -569,13 +569,21 @@ async def get_trino_schema_info() -> list:
             logger.warning(f"[TRINO SCHEMA] Failed to read other connections: {e}")
 
     if not tables:
+        logger.warning("[TRINO SCHEMA] No tables found for Trino schema")
         return []
 
     from backend.core.config import parse_tables_by_catalog
     import backend.core.config as cfg
     old = cfg.ALLOWED_TABLES_BY_CATALOG
-    cfg.ALLOWED_TABLES_BY_CATALOG = parse_tables_by_catalog(tables)
+    by_catalog = parse_tables_by_catalog(tables)
+    logger.info(f"[TRINO SCHEMA] Tables: {len(tables)}, Catalogs: {list(by_catalog.keys())}")
+    cfg.ALLOWED_TABLES_BY_CATALOG = by_catalog
     try:
-        return await _trino_adapter.get_schema_info(tables)
+        result = await _trino_adapter.get_schema_info(tables)
+        logger.info(f"[TRINO SCHEMA] Result: {len(result)} tables with columns")
+        return result
+    except Exception as e:
+        logger.error(f"[TRINO SCHEMA] get_schema_info failed: {type(e).__name__}: {e}")
+        raise
     finally:
         cfg.ALLOWED_TABLES_BY_CATALOG = old

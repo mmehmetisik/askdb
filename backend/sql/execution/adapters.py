@@ -717,7 +717,11 @@ class TrinoAdapter(DatabaseAdapter):
                     if not table_names:
                         continue
                     # Her catalog icin kendi baglantisini ac (session catalog dogrulama icin)
-                    conn = self._get_conn(catalog=catalog, schema=schema)
+                    try:
+                        conn = self._get_conn(catalog=catalog, schema=schema)
+                    except Exception as conn_err:
+                        logger.warning(f"[TRINO SCHEMA] Connection failed for catalog={catalog}: {conn_err}")
+                        continue
                     try:
                         safe_catalog = quote_identifier(catalog)
                         safe_schema_val = schema.replace("'", "''")
@@ -756,8 +760,13 @@ class TrinoAdapter(DatabaseAdapter):
                                 "nullable": row_dict["is_nullable"] == "YES",
                                 "is_pk": False,
                             })
+                    except Exception as query_err:
+                        logger.warning(f"[TRINO SCHEMA] Query failed for catalog={catalog}.{schema}: {query_err}")
                     finally:
-                        conn.close()
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
             return sorted(all_tables.values(), key=lambda t: t["full_name"])
 
         return await asyncio.get_running_loop().run_in_executor(None, _exec)

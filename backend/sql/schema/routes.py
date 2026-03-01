@@ -29,8 +29,12 @@ async def get_schema(user: dict = Depends(get_current_user)):
     adapter = await get_auth_adapter()
 
     if use_trino:
-        trino_tables = await get_trino_schema_info()
-        tables = trino_tables if trino_tables else await get_schema_info()
+        try:
+            trino_tables = await get_trino_schema_info()
+            tables = trino_tables if trino_tables else await get_schema_info()
+        except Exception as trino_err:
+            logger.warning(f"[SCHEMA] Trino schema failed, falling back to direct: {trino_err}")
+            tables = await get_schema_info()
     else:
         tables = await get_schema_info()
 
