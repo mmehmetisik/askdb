@@ -262,6 +262,8 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=400, detail="Railway API token yapilandirilmamis.")
 
     env_id = await _get_railway_environment_id()
+    logger.info(f"[RAILWAY START] token={RAILWAY_API_TOKEN[:8]}..., service={RAILWAY_TRINO_SERVICE_ID}, env={env_id}")
+
     if not env_id:
         raise HTTPException(status_code=500, detail="Railway environment ID bulunamadi.")
 
@@ -274,6 +276,7 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
         "serviceId": RAILWAY_TRINO_SERVICE_ID,
         "environmentId": env_id,
     })
+    logger.info(f"[RAILWAY START] result={result}")
 
     if "errors" in result and not result.get("data"):
         raise HTTPException(
