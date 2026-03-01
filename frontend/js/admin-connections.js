@@ -103,6 +103,12 @@ async function restartTrino() {
     if (!confirm("Trino baglantisi yeniden baslatilacak. Devam edilsin mi?")) return;
     try {
         var res = await fetch(API_BASE + "/api/trino/restart", { method: "POST", headers: getAuthHeaders(), credentials: "include" });
+        if (!res.ok) {
+            var text = await res.text();
+            try { var err = JSON.parse(text); alert(err.detail || err.message || "Restart basarisiz (HTTP " + res.status + ")"); }
+            catch(_) { alert("API hatasi (HTTP " + res.status + "): " + text.substring(0, 200)); }
+            fetchConnections(); return;
+        }
         var data = await res.json();
         if (data.success) {
             alert("Trino basariyla yeniden baslatildi!");
@@ -157,6 +163,12 @@ async function stopRailwayTrino() {
     if (!confirm("Trino servisi Railway'de durdurulacak.\n\n• Cross-DB sorgulari calismayacak\n• Para yazmayacak\n\nDevam edilsin mi?")) return;
     try {
         var res = await fetch(API_BASE + "/api/trino/railway/stop", { method: "POST", headers: getAuthHeaders(), credentials: "include" });
+        if (!res.ok) {
+            var text = await res.text();
+            try { var err = JSON.parse(text); alert(err.detail || err.message || "Durdurma basarisiz (HTTP " + res.status + ")"); }
+            catch(_) { alert("Railway API hatasi (HTTP " + res.status + "): " + text.substring(0, 200)); }
+            return;
+        }
         var data = await res.json();
         if (data.success) {
             alert(data.message);
@@ -173,6 +185,12 @@ async function startRailwayTrino() {
     if (!confirm("Trino servisi Railway'de baslatilacak.\n\nDeploy 1-2 dakika surebilir.\nDevam edilsin mi?")) return;
     try {
         var res = await fetch(API_BASE + "/api/trino/railway/start", { method: "POST", headers: getAuthHeaders(), credentials: "include" });
+        if (!res.ok) {
+            var text = await res.text();
+            try { var err = JSON.parse(text); alert(err.detail || err.message || "Baslatma basarisiz (HTTP " + res.status + ")"); }
+            catch(_) { alert("Railway API hatasi (HTTP " + res.status + "): " + text.substring(0, 200)); }
+            return;
+        }
         var data = await res.json();
         if (data.success) {
             alert(data.message);
