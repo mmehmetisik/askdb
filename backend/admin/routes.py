@@ -119,6 +119,42 @@ async def _railway_gql(query: str, variables: dict = None) -> dict:
             return {"errors": [{"message": f"Railway API gecersiz yanit: {resp.text[:200]}"}]}
 
 
+_cached_trino_service_id: str = ""
+
+
+async def _get_trino_service_id() -> str:
+    """Trino servis ID'sini getir — env var veya Railway API'den otomatik kesfet."""
+    global _cached_trino_service_id
+    # 1. Env variable varsa onu kullan
+    if RAILWAY_TRINO_SERVICE_ID:
+        return RAILWAY_TRINO_SERVICE_ID
+    # 2. Cache varsa onu kullan
+    if _cached_trino_service_id:
+        return _cached_trino_service_id
+    # 3. Railway API'den kesfet: projedeki servisleri listele, "trino" icereni bul
+    if not RAILWAY_API_TOKEN or not RAILWAY_PROJECT_ID:
+        return ""
+    query = """
+    query($projectId: String!) {
+      project(id: $projectId) {
+        services { edges { node { id name } } }
+      }
+    }
+    """
+    result = await _railway_gql(query, {"projectId": RAILWAY_PROJECT_ID})
+    data = result.get("data") or {}
+    edges = (data.get("project") or {}).get("services", {}).get("edges", [])
+    for edge in edges:
+        node = edge.get("node", {})
+        name = node.get("name", "").lower()
+        if "trino" in name:
+            _cached_trino_service_id = node["id"]
+            logger.info(f"[RAILWAY] Trino service auto-discovered: {node['name']} (id={_cached_trino_service_id})")
+            return _cached_trino_service_id
+    logger.warning(f"[RAILWAY] No Trino service found in project. Services: {[e.get('node',{}).get('name','') for e in edges]}")
+    return ""
+
+
 async def _get_railway_environment_id() -> str:
     """Railway production environment ID'sini getir."""
     # Direkt env variable varsa API sorgusu yapmaya gerek yok
@@ -155,6 +191,11 @@ async def trino_railway_status(_admin: dict = Depends(require_admin)):
     if not RAILWAY_API_TOKEN:
         return {"success": True, "configured": False, "running": False}
 
+    service_id = await _get_trino_service_id()
+    if not service_id:
+        return {"success": False, "configured": False, "running": False,
+                "message": "Trino servisi bulunamadi. RAILWAY_TRINO_SERVICE_ID ayarlayin veya projede 'trino' adinda servis olsun."}
+
     query = """
     query($serviceId: String!) {
       service(id: $serviceId) {
@@ -167,7 +208,7 @@ async def trino_railway_status(_admin: dict = Depends(require_admin)):
       }
     }
     """
-    result = await _railway_gql(query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
+    result = await _railway_gql(query, {"serviceId": service_id})
 
     if "errors" in result and not result.get("data"):
         return {"success": False, "configured": True, "running": False,
@@ -203,6 +244,10 @@ async def trino_railway_stop(_admin: dict = Depends(require_admin)):
     if not RAILWAY_API_TOKEN:
         raise HTTPException(status_code=400, detail="Railway API token yapilandirilmamis.")
 
+    service_id = await _get_trino_service_id()
+    if not service_id:
+        raise HTTPException(status_code=400, detail="Trino servis ID bulunamadi. RAILWAY_TRINO_SERVICE_ID ayarlayin veya projede 'trino' adinda servis olsun.")
+
     # En son deployment'i bul
     status_query = """
     query($serviceId: String!) {
@@ -215,7 +260,7 @@ async def trino_railway_stop(_admin: dict = Depends(require_admin)):
       }
     }
     """
-    result = await _railway_gql(status_query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
+    result = await _railway_gql(status_query, {"serviceId": service_id})
     edges = (
         (result.get("data") or {}).get("service") or {}
     ).get("deployments", {}).get("edges", [])
@@ -265,11 +310,13 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
     """Railway'deki Trino servisini baslat (admin-only)."""
     if not RAILWAY_API_TOKEN:
         raise HTTPException(status_code=400, detail="Railway API token yapilandirilmamis.")
-    if not RAILWAY_TRINO_SERVICE_ID:
-        raise HTTPException(status_code=400, detail="RAILWAY_TRINO_SERVICE_ID yapilandirilmamis.")
+
+    service_id = await _get_trino_service_id()
+    if not service_id:
+        raise HTTPException(status_code=400, detail="Trino servis ID bulunamadi. RAILWAY_TRINO_SERVICE_ID ayarlayin veya projede 'trino' adinda servis olsun.")
 
     env_id = await _get_railway_environment_id()
-    logger.info(f"[RAILWAY START] token={RAILWAY_API_TOKEN[:8]}..., service={RAILWAY_TRINO_SERVICE_ID}, env={env_id}")
+    logger.info(f"[RAILWAY START] token={RAILWAY_API_TOKEN[:8]}..., service={service_id}, env={env_id}")
 
     if not env_id:
         raise HTTPException(status_code=500, detail="Railway environment ID bulunamadi.")
@@ -281,7 +328,7 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
     }
     """
     result = await _railway_gql(redeploy_mutation, {
-        "serviceId": RAILWAY_TRINO_SERVICE_ID,
+        "serviceId": service_id,
         "environmentId": env_id,
     })
     logger.info(f"[RAILWAY START] serviceInstanceRedeploy result={result}")
@@ -304,7 +351,7 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
       }
     }
     """
-    status_result = await _railway_gql(status_query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
+    status_result = await _railway_gql(status_query, {"serviceId": service_id})
     data = status_result.get("data") or {}
     edges = (
         data.get("service") or {}
