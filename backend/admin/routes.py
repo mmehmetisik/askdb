@@ -340,21 +340,26 @@ async def test_db_connection(req: DBConnectionTest, request: Request, _admin: di
     """Verilen bilgilerle veritabanina baglanti testi yap (admin-only)."""
     from backend.sql.execution.adapters import create_adapter
 
+    from urllib.parse import quote_plus
+    _pw = quote_plus(req.password) if req.password else ""
+    _user = quote_plus(req.username) if req.username else ""
+
     if req.db_type == "trino":
-        url = f"trino://{req.username}@{req.host}:{req.port}/{req.database_name}"
+        url = f"trino://{_user}@{req.host}:{req.port}/{req.database_name}"
     elif req.db_type == "postgresql":
-        url = f"postgresql://{req.username}:{req.password}@{req.host}:{req.port}/{req.database_name}"
+        ssl_suffix = "?sslmode=require" if req.ssl_enabled else ""
+        url = f"postgresql://{_user}:{_pw}@{req.host}:{req.port}/{req.database_name}{ssl_suffix}"
     elif req.db_type in ("mysql", "mariadb"):
-        url = f"mysql://{req.username}:{req.password}@{req.host}:{req.port}/{req.database_name}"
+        url = f"mysql://{_user}:{_pw}@{req.host}:{req.port}/{req.database_name}"
     elif req.db_type == "mssql":
-        url = f"mssql://{req.username}:{req.password}@{req.host}:{req.port}/{req.database_name}"
+        url = f"mssql://{_user}:{_pw}@{req.host}:{req.port}/{req.database_name}"
     else:
         raise HTTPException(status_code=400, detail=_t("connections.unsupportedType", get_lang(request), type=req.db_type))
 
     adapter_type = "mysql" if req.db_type == "mariadb" else req.db_type
 
     try:
-        test_adapter = create_adapter(adapter_type, url)
+        test_adapter = create_adapter(adapter_type, url, ssl_enabled=req.ssl_enabled)
         await test_adapter.init()
         result = await test_adapter.fetchval("SELECT 1")
         await test_adapter.close()
@@ -374,23 +379,29 @@ async def discover_tables(conn_id: int, request: Request, _admin: dict = Depends
 
     c = conn if isinstance(conn, dict) else dict(conn)
     from backend.sql.execution.adapters import create_adapter
+    from urllib.parse import quote_plus
 
     db_type = c["db_type"]
+    _pw = quote_plus(c["password"]) if c.get("password") else ""
+    _user = quote_plus(c["username"]) if c.get("username") else ""
+    ssl_enabled = bool(c.get("ssl_enabled", False))
+
     if db_type == "trino":
-        url = f"trino://{c['username']}@{c['host']}:{c['port']}/{c['database_name']}"
+        url = f"trino://{_user}@{c['host']}:{c['port']}/{c['database_name']}"
     elif db_type == "postgresql":
-        url = f"postgresql://{c['username']}:{c['password']}@{c['host']}:{c['port']}/{c['database_name']}"
+        ssl_suffix = "?sslmode=require" if ssl_enabled else ""
+        url = f"postgresql://{_user}:{_pw}@{c['host']}:{c['port']}/{c['database_name']}{ssl_suffix}"
     elif db_type in ("mysql", "mariadb"):
-        url = f"mysql://{c['username']}:{c['password']}@{c['host']}:{c['port']}/{c['database_name']}"
+        url = f"mysql://{_user}:{_pw}@{c['host']}:{c['port']}/{c['database_name']}"
     elif db_type == "mssql":
-        url = f"mssql://{c['username']}:{c['password']}@{c['host']}:{c['port']}/{c['database_name']}"
+        url = f"mssql://{_user}:{_pw}@{c['host']}:{c['port']}/{c['database_name']}"
     else:
         raise HTTPException(status_code=400, detail=_t("connections.unsupportedType", get_lang(request), type=db_type))
 
     adapter_type = "mysql" if db_type == "mariadb" else db_type
 
     try:
-        test_adapter = create_adapter(adapter_type, url)
+        test_adapter = create_adapter(adapter_type, url, ssl_enabled=ssl_enabled)
         await test_adapter.init()
 
         if db_type == "trino":
