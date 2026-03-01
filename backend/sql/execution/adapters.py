@@ -181,8 +181,9 @@ class PostgreSQLAdapter(DatabaseAdapter):
 
 # =================== MYSQL ===================
 class MySQLAdapter(DatabaseAdapter):
-    def __init__(self, url: str):
+    def __init__(self, url: str, ssl_enabled: bool = False):
         self.url = url
+        self.ssl_enabled = ssl_enabled
         self.pool = None
         self._db_name = None
 
@@ -202,6 +203,11 @@ class MySQLAdapter(DatabaseAdapter):
     async def init(self):
         import aiomysql
         params = self._parse_url()
+        # SSL destegi (TiDB Cloud vb. icin gerekli)
+        if self.ssl_enabled:
+            import ssl as _ssl
+            ssl_ctx = _ssl.create_default_context()
+            params["ssl"] = ssl_ctx
         self.pool = await aiomysql.create_pool(
             minsize=2, maxsize=10, connect_timeout=30, **params
         )
@@ -798,13 +804,13 @@ def _mssql_type_name(type_code) -> str:
     return _map.get(type_code, "unknown")
 
 
-def create_adapter(db_type: str, url: str) -> DatabaseAdapter:
+def create_adapter(db_type: str, url: str, ssl_enabled: bool = False) -> DatabaseAdapter:
     """Verilen tipe gore uygun adapter olustur."""
     db_type = db_type.lower().strip()
     if db_type in ("postgresql", "postgres"):
         return PostgreSQLAdapter(url)
     elif db_type == "mysql":
-        return MySQLAdapter(url)
+        return MySQLAdapter(url, ssl_enabled=ssl_enabled)
     elif db_type == "mssql":
         return MSSQLAdapter(url)
     elif db_type == "trino":
