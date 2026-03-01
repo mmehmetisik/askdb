@@ -82,6 +82,14 @@ def _parse_allowed_tables():
 
 ALLOWED_TABLES, ALLOWED_TABLES_BY_CATALOG = _parse_allowed_tables()
 
+# Runtime'da db_connections'dan kesfedilen tablolar (init_direct_adapters tarafindan doldurulur)
+DYNAMIC_ALLOWED_TABLES: set[str] = set()
+
+
+def get_all_allowed_tables_sync() -> set[str]:
+    """ALLOWED_TABLES + DYNAMIC_ALLOWED_TABLES (sync, guvenlik kontrolu icin)."""
+    return ALLOWED_TABLES | DYNAMIC_ALLOWED_TABLES
+
 # ---------- ZORUNLU DEGISKENLER ----------
 _has_llm = any([GROQ_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY])
 if not _has_llm:

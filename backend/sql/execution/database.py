@@ -8,6 +8,7 @@ from decimal import Decimal
 from datetime import date, datetime, time, timedelta
 from fastapi import HTTPException
 from backend.core.config import DATABASE_URL, MAX_QUERY_ROWS, ALLOWED_TABLES, DB_TYPE, DB_MODE, TRINO_URL, AUTH_DATABASE_URL, AUTH_DB_TYPE, logger
+import backend.core.config as _cfg
 
 # Active adapter instances
 _adapter = None       # Query adapter (Trino or direct)
@@ -194,6 +195,8 @@ async def _get_dynamic_allowed_tables() -> set:
         logger.warning(f"[SCHEMA] Failed to read db_connections: {e}")
 
     _dynamic_tables_cache = {"tables": dynamic, "timestamp": now}
+    # Guvenlik modulunun de gorebilmesi icin sync set'i guncelle
+    _cfg.DYNAMIC_ALLOWED_TABLES = dynamic
     return dynamic
 
 
@@ -328,6 +331,11 @@ async def init_direct_adapters():
             logger.info(f"[DIRECT] Adapter initialized: {c['name']} ({c['db_type']}, id={conn_id})")
         except Exception as e:
             logger.warning(f"[DIRECT] Failed to init adapter for {c['name']}: {e}")
+
+    # Guvenlik modulune tum dinamik tablolari bildir
+    all_dynamic = set(_table_conn_map.keys())
+    _cfg.DYNAMIC_ALLOWED_TABLES = all_dynamic
+    logger.info(f"[DIRECT] DYNAMIC_ALLOWED_TABLES updated: {len(all_dynamic)} tables")
 
 
 async def close_direct_adapters():

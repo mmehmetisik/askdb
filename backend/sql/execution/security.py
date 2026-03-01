@@ -2,7 +2,7 @@
 import re
 from sqlglot import parse as sqlglot_parse, exp
 from sqlglot.errors import ParseError
-from backend.core.config import ALLOWED_TABLES, DB_TYPE, DB_MODE, logger
+from backend.core.config import ALLOWED_TABLES, DB_TYPE, DB_MODE, logger, get_all_allowed_tables_sync
 
 
 # Dialect mapping (config -> sqlglot)
@@ -157,22 +157,23 @@ def is_safe_sql(sql: str) -> bool:
     if _check_blocked(parsed):
         return False
 
-    # 7) Allowed table check
+    # 7) Allowed table check (static + dynamic from db_connections)
     referenced_tables = _extract_tables(parsed)
     if referenced_tables:
         common_aliases = {"src", "t", "t1", "t2", "tmp", "cte", "ranked", "base", "agg", "sub", "s", "r", "_sub"}
         real_tables = referenced_tables - common_aliases
 
         if real_tables:
-            allowed_lower = {t.lower() for t in ALLOWED_TABLES}
+            all_allowed = get_all_allowed_tables_sync()
+            allowed_lower = {t.lower() for t in all_allowed}
             if DB_MODE == "trino":
-                allowed_short = {t.split(".")[-1].lower() for t in ALLOWED_TABLES}
+                allowed_short = {t.split(".")[-1].lower() for t in all_allowed}
                 unauthorized = {t for t in real_tables if t not in allowed_lower and t not in allowed_short}
             else:
                 unauthorized = real_tables - allowed_lower
 
             if unauthorized:
-                logger.warning(f"[SECURITY] Unauthorized table access: {unauthorized}")
+                logger.warning(f"[SECURITY] Unauthorized table access: {unauthorized} (allowed: {len(allowed_lower)} tables)")
                 return False
 
     return True
