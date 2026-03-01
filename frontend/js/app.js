@@ -47,9 +47,8 @@ var skeletonArea = document.getElementById("skeletonArea");
             dbBadge.innerHTML = '<i class="fas fa-project-diagram"></i> Cross-DB'
               + ' <span class="llm-badge">' + providerName + '</span>';
           } else {
-            var dbLabel = (data.db_type || "PostgreSQL").toUpperCase();
             dbBadge.className = 'db-badge db-badge-direct';
-            dbBadge.innerHTML = '<i class="fas fa-database"></i> Direct · ' + dbLabel
+            dbBadge.innerHTML = '<i class="fas fa-database"></i> Direct'
               + ' <span class="llm-badge">' + providerName + '</span>';
           }
         }

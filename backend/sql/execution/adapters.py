@@ -189,14 +189,14 @@ class MySQLAdapter(DatabaseAdapter):
 
     def _parse_url(self):
         """mysql://user:pass@host:port/dbname seklindeki URL'i parse et."""
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, unquote
         parsed = urlparse(self.url.replace("mysql://", "mysql://"))
         self._db_name = parsed.path.lstrip("/")
         return {
             "host": parsed.hostname or "localhost",
             "port": parsed.port or 3306,
-            "user": parsed.username or "root",
-            "password": parsed.password or "",
+            "user": unquote(parsed.username or "root"),
+            "password": unquote(parsed.password or ""),
             "db": self._db_name,
         }
 
