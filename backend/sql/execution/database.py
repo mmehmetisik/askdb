@@ -327,10 +327,20 @@ async def run_sql_trino(sql: str, limit: int | None = None) -> dict:
 
 
 async def get_trino_schema_info() -> list:
-    """Get schema info via Trino (filtered by allowed_tables)."""
+    """Get schema info via Trino (filtered by allowed_tables).
+
+    Trino federation tablolari su kaynaklardan toplanir:
+    1. trino_federation baglantisinin kendi allowed_tables'i
+    2. Bos ise, TUM aktif (non-Trino) baglantilarin allowed_tables'i birlestirilir
+    Boylece admin tek tek Trino kesfetmese bile, diger baglantilarda kesif
+    yapildiysa tablolar Trino uzerinden gorulur.
+    """
     if not _trino_adapter:
         return []
 
+    tables = set()
+
+    # 1. Trino baglantisinin kendi allowed_tables'i
     if _trino_conn_id and _auth_adapter:
         row = await _auth_adapter.fetchrow(
             "SELECT allowed_tables FROM db_connections WHERE id = $1", _trino_conn_id
@@ -338,15 +348,35 @@ async def get_trino_schema_info() -> list:
         if row:
             tables_str = row["allowed_tables"] if isinstance(row, dict) else row[0]
             if tables_str and tables_str != "[]":
-                tables = set(_json.loads(tables_str))
-                if tables:
-                    from backend.core.config import parse_tables_by_catalog
-                    import backend.core.config as cfg
-                    old = cfg.ALLOWED_TABLES_BY_CATALOG
-                    cfg.ALLOWED_TABLES_BY_CATALOG = parse_tables_by_catalog(tables)
-                    try:
-                        return await _trino_adapter.get_schema_info(tables)
-                    finally:
-                        cfg.ALLOWED_TABLES_BY_CATALOG = old
+                try:
+                    tables = set(_json.loads(tables_str))
+                except Exception:
+                    pass
 
-    return []
+    # 2. Bos ise, tum aktif non-Trino baglantilarin tablolarini topla
+    if not tables and _auth_adapter:
+        try:
+            rows = await _auth_adapter.fetch(
+                "SELECT allowed_tables FROM db_connections WHERE is_active = true AND db_type != 'trino'"
+            )
+            for r in rows:
+                ts = r["allowed_tables"] if isinstance(r, dict) else r[0]
+                if ts and ts != "[]":
+                    try:
+                        tables.update(_json.loads(ts))
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.warning(f"[TRINO SCHEMA] Failed to read other connections: {e}")
+
+    if not tables:
+        return []
+
+    from backend.core.config import parse_tables_by_catalog
+    import backend.core.config as cfg
+    old = cfg.ALLOWED_TABLES_BY_CATALOG
+    cfg.ALLOWED_TABLES_BY_CATALOG = parse_tables_by_catalog(tables)
+    try:
+        return await _trino_adapter.get_schema_info(tables)
+    finally:
+        cfg.ALLOWED_TABLES_BY_CATALOG = old
