@@ -71,6 +71,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
         self.pool = await asyncpg.create_pool(
             self.url, min_size=2, max_size=10,
             command_timeout=60, timeout=30,
+            statement_cache_size=0,  # pgbouncer uyumlulugu (Supabase vb.)
         )
 
     async def close(self):
@@ -98,15 +99,8 @@ class PostgreSQLAdapter(DatabaseAdapter):
     async def run_query(self, sql: str, max_rows: int) -> dict:
         async with self.pool.acquire() as conn:
             limited_sql = f"SELECT * FROM ({sql}) AS _sub LIMIT {max_rows + 1}"
-            stmt = await conn.prepare(limited_sql)
-            attributes = stmt.get_attributes()
-
-            column_types = []
-            for attr in attributes:
-                type_name = attr.type.name if hasattr(attr.type, 'name') else "unknown"
-                column_types.append(type_name)
-
-            rows = await stmt.fetch()
+            # pgbouncer uyumlulugu: prepare() yerine fetch() kullan
+            rows = await conn.fetch(limited_sql)
 
             if not rows:
                 return {
@@ -115,6 +109,7 @@ class PostgreSQLAdapter(DatabaseAdapter):
                 }
 
             headers = list(rows[0].keys())
+            column_types = [_pg_python_type(rows[0][h]) for h in headers]
             truncated = len(rows) > max_rows
             if truncated:
                 rows = rows[:max_rows]
@@ -780,6 +775,31 @@ class TrinoAdapter(DatabaseAdapter):
 
 
 # =================== HELPERS ===================
+def _pg_python_type(val) -> str:
+    """Python degerinden PostgreSQL tip adini tahmin et (pgbouncer modunda prepare() kullanilamaz)."""
+    if val is None:
+        return "text"
+    if isinstance(val, bool):
+        return "boolean"
+    if isinstance(val, int):
+        return "integer"
+    if isinstance(val, float):
+        return "double precision"
+    from decimal import Decimal
+    if isinstance(val, Decimal):
+        return "numeric"
+    from datetime import datetime, date, time, timedelta
+    if isinstance(val, datetime):
+        return "timestamp"
+    if isinstance(val, date):
+        return "date"
+    if isinstance(val, time):
+        return "time"
+    if isinstance(val, timedelta):
+        return "interval"
+    return "text"
+
+
 def _mysql_type_name(type_code) -> str:
     """MySQL cursor description type code'u okunabilir isme donustur."""
     try:
