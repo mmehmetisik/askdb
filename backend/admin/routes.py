@@ -442,7 +442,11 @@ async def discover_tables(conn_id: int, request: Request, _admin: dict = Depends
                 )
             tables = []
             for r in rows:
-                tbl = r["table_name"] if isinstance(r, dict) else r[0]
+                if isinstance(r, dict):
+                    # MySQL TABLE_NAME (buyuk harf), PostgreSQL table_name (kucuk harf)
+                    tbl = r.get("table_name") or r.get("TABLE_NAME") or list(r.values())[0]
+                else:
+                    tbl = r[0]
                 tables.append({"table": tbl, "full_name": tbl})
 
         await test_adapter.close()
