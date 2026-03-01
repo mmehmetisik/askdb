@@ -102,30 +102,9 @@ if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET ortam degiskeni gerekli! Guvenlik icin benzersiz bir secret belirleyin.")
 
 # ---------- SCHEMA & PROMPTS ----------
-# Statik schema — varsayilan. Dinamik schema DB'den calisma zamaninda cekilir.
-SCHEMA_INFO = """
-CREATE TABLE customers (
-  customer_id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  email TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE orders (
-  order_id SERIAL PRIMARY KEY,
-  customer_id INT REFERENCES customers(customer_id),
-  order_date DATE NOT NULL,
-  total_amount NUMERIC(10,2) NOT NULL
-);
-
-CREATE TABLE order_items (
-  order_item_id SERIAL PRIMARY KEY,
-  order_id INT REFERENCES orders(order_id),
-  product_name TEXT NOT NULL,
-  quantity INT NOT NULL,
-  unit_price NUMERIC(10,2) NOT NULL
-);
-"""
+# Statik schema — varsayilan fallback. Dinamik schema DB'den calisma zamaninda cekilir.
+# NOT: Bu sadece dinamik schema yuklenemediginde kullanilir. Normal calismada DB'den otomatik cekilir.
+SCHEMA_INFO = "(Schema bilgisi dinamik olarak veritabanindan yuklenir. Statik schema mevcut degil.)"
 
 # Dinamik schema icin global degisken (calisma zamaninda doldurulur)
 DYNAMIC_SCHEMA: str = ""
@@ -146,20 +125,25 @@ BUSINESS_LOGIC = """
 """
 
 FEW_SHOT_EXAMPLES = """
-Soru: Son 3 gunde kac siparis verilmis?
-SQL: select count(*) from orders where order_date >= current_date - interval '3 days';
+Asagidaki ornekler SQL kaliplarini gostermektedir. Gercek tablo ve sutun isimlerini YUKARIDAKI SCHEMA bilgisinden al.
 
-Soru: Son 3 gunde musteri basina kac siparis verilmis?
-SQL: select c.name, count(o.order_id) as order_count from customers c join orders o on c.customer_id = o.customer_id where o.order_date >= current_date - interval '3 days' group by c.name order by order_count desc;
+Soru: Toplam kayit sayisi kac?
+SQL: SELECT COUNT(*) AS toplam FROM <tablo>;
 
-Soru: En cok satilan urunler hangileri?
-SQL: select product_name, sum(quantity) as total_sold from order_items group by product_name order by total_sold desc;
+Soru: Son 7 gundeki kayitlar neler?
+SQL: SELECT * FROM <tablo> WHERE <tarih_sutunu> >= CURRENT_DATE - INTERVAL '7 days' ORDER BY <tarih_sutunu> DESC;
 
-Soru: En cok siparis veren 3 musteri kim?
-SQL: select c.name, count(o.order_id) as order_count from customers c join orders o on c.customer_id = o.customer_id group by c.name order by order_count desc limit 3;
+Soru: En yuksek degere sahip ilk 5 kayit?
+SQL: SELECT * FROM <tablo> ORDER BY <sayisal_sutun> DESC LIMIT 5;
 
-Soru: Hangi musteri ne kadar toplam harcama yapmis?
-SQL: select c.name, sum(o.total_amount) as total_spent from customers c join orders o on c.customer_id = o.customer_id group by c.name order by total_spent desc;
+Soru: Kategoriye gore toplam ve ortalama nedir?
+SQL: SELECT <kategori_sutunu>, COUNT(*) AS adet, SUM(<deger_sutunu>) AS toplam, AVG(<deger_sutunu>) AS ortalama FROM <tablo> GROUP BY <kategori_sutunu> ORDER BY toplam DESC;
+
+Soru: Iki tablo arasindaki iliskili verileri getir
+SQL: SELECT a.*, b.<sutun> FROM <tablo_a> a JOIN <tablo_b> b ON a.<ortak_id> = b.<ortak_id> ORDER BY a.<sutun> DESC LIMIT 20;
+
+Soru: Belirli bir isimdeki kayitlari bul
+SQL: SELECT * FROM <tablo> WHERE <metin_sutunu> ILIKE '%arama_kelimesi%';
 """
 
 
