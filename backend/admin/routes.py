@@ -236,9 +236,17 @@ async def trino_railway_stop(_admin: dict = Depends(require_admin)):
     result = await _railway_gql(remove_mutation, {"id": deployment_id})
 
     if "errors" in result and not result.get("data"):
+        err_msg = str(result["errors"])
+        if "Not Authorized" in err_msg or "authorized" in err_msg.lower():
+            raise HTTPException(
+                status_code=502,
+                detail="Railway servisi Railway icinden durdurulamiyor (platform kisitlamasi). "
+                       "Trino'yu durdurmak icin Railway Dashboard'a gidin: "
+                       "https://railway.app/project/" + RAILWAY_PROJECT_ID + " → Trino deployment'ini silin.",
+            )
         raise HTTPException(
             status_code=500,
-            detail=f"Railway API hatasi: {result['errors']}",
+            detail=f"Railway API hatasi: {err_msg}",
         )
 
     # AskDB tarafinda da Trino'yu deaktif et
@@ -267,6 +275,7 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
     if not env_id:
         raise HTTPException(status_code=500, detail="Railway environment ID bulunamadi.")
 
+    # 1. Yontem: serviceInstanceRedeploy
     redeploy_mutation = """
     mutation($serviceId: String!, $environmentId: String!) {
       serviceInstanceRedeploy(serviceId: $serviceId, environmentId: $environmentId)
@@ -276,16 +285,56 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
         "serviceId": RAILWAY_TRINO_SERVICE_ID,
         "environmentId": env_id,
     })
-    logger.info(f"[RAILWAY START] result={result}")
+    logger.info(f"[RAILWAY START] serviceInstanceRedeploy result={result}")
 
-    if "errors" in result and not result.get("data"):
-        raise HTTPException(
-            status_code=500,
-            detail=f"Railway API hatasi: {result['errors']}",
-        )
+    # Basarili ise direkt don
+    if not ("errors" in result and not result.get("data")):
+        logger.info("[RAILWAY] Trino service started via serviceInstanceRedeploy")
+        return {"success": True, "message": "Trino servisi baslatildi. Deploy 1-2 dakika surebilir."}
 
-    logger.info("[RAILWAY] Trino service started on Railway")
-    return {"success": True, "message": "Trino servisi baslatildi. Deploy 1-2 dakika surebilir."}
+    # 2. Yontem: deploymentRedeploy (son deployment'i yeniden deploy et)
+    logger.warning(f"[RAILWAY] serviceInstanceRedeploy failed, trying deploymentRedeploy...")
+    status_query = """
+    query($serviceId: String!) {
+      service(id: $serviceId) {
+        deployments(first: 1) {
+          edges {
+            node { id status }
+          }
+        }
+      }
+    }
+    """
+    status_result = await _railway_gql(status_query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
+    edges = (
+        status_result.get("data", {})
+        .get("service", {})
+        .get("deployments", {})
+        .get("edges", [])
+    )
+
+    if edges:
+        deployment_id = edges[0]["node"]["id"]
+        deploy_mutation = """
+        mutation($id: String!) {
+          deploymentRedeploy(id: $id)
+        }
+        """
+        result2 = await _railway_gql(deploy_mutation, {"id": deployment_id})
+        logger.info(f"[RAILWAY START] deploymentRedeploy result={result2}")
+
+        if not ("errors" in result2 and not result2.get("data")):
+            logger.info("[RAILWAY] Trino service started via deploymentRedeploy")
+            return {"success": True, "message": "Trino servisi baslatildi. Deploy 1-2 dakika surebilir."}
+
+    # Her iki yontem de basarisiz — Railway platform kisitlamasi
+    logger.error("[RAILWAY] Both redeploy methods failed — likely Railway platform restriction")
+    raise HTTPException(
+        status_code=502,
+        detail="Railway servisi Railway icinden baslatilemiyor (platform kisitlamasi). "
+               "Trino'yu baslatmak icin Railway Dashboard'a gidin: "
+               "https://railway.app/project/" + RAILWAY_PROJECT_ID + " → Trino servisine tiklayin → Redeploy yapin.",
+    )
 
 
 # ── DB Connections ──

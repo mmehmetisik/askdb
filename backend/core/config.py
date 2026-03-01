@@ -131,20 +131,18 @@ CREATE TABLE order_items (
 DYNAMIC_SCHEMA: str = ""
 
 BUSINESS_LOGIC = """
-- 'Alisveris sayisi' veya 'siparis sayisi', orders tablosundaki satir sayisidir.
-- 'En cok harcama yapan' kisi, orders tablosundaki total_amount toplami en yuksek olandir.
-- 'Populer urunler', order_items tablosunda quantity (adet) toplami en fazla olanlardir.
-- 'Yeni musteriler', created_at tarihi son 30 gun icinde olanlardir.
-- Veritabaninda 'kullanici', 'user' ve 'musteri' ayni anlamda (customers tablosu) kullanilir.
-- 'Kullanici', 'Uye' veya 'Musteri' dendiginde 'customers' tablosuna bak.
-- 'Satis', 'Kazanc' veya 'Ciro' dendiginde 'orders' tablosundaki 'total_amount' sutununu topla.
-- 'Siparis sayisi' dendiginde 'orders' tablosundaki satirlari say.
-- 'Urunler' ile ilgili bir sey soruldugunda 'order_items' tablosunu kullan.
-- Isim aramalarinda her zaman 'ILIKE' kullanarak buyuk/kucuk harf duyarliligini ortadan kaldir.
-- 'Son X gun' ifadeleri orders.order_date uzerinden filtrelenir (customers.created_at degil).
-- 'Toplam urun adedi' = sum(order_items.quantity); 'siparis basina urun adedi' = order bazinda sum(quantity) sonra avg.
-- 'En pahali urun' = max(order_items.unit_price).
-- 'Siparis tutar' = orders.total_amount
+- Tablo ve sutun isimlerini YALNIZCA verilen schema bilgisinden sec. Schema'da bulunmayan tablo veya sutun ASLA kullanma.
+- Isim aramalarinda buyuk/kucuk harf duyarsiz arama yap (PostgreSQL: ILIKE, MySQL: LIKE, MSSQL: LIKE).
+- Tarih filtrelerinde tablodaki tarih/zaman sutunlarini kullan.
+- 'Son X gun' ifadelerinde uygun tarih sutununu ve CURRENT_DATE - INTERVAL kullan.
+- Aggregation gerektiren sorularda GROUP BY ile SUM, AVG, COUNT, MAX, MIN kullan.
+- Sonuclari anlamli siralama ile dondur (genellikle buyukten kucuge DESC).
+- NULL degerleri icin COALESCE veya IS NULL / IS NOT NULL kullan.
+- Metin aramalarinda '%keyword%' wildcard kalibini kullan.
+- Sonuc sayisini LIMIT ile sinirla (gereksiz buyuk sonuc kumesi dondurme).
+- Birden fazla tablo arasi iliskili sorgularda uygun JOIN turunu sec.
+- Sayisal degerler icin SUM (toplam), COUNT (adet), AVG (ortalama) ayrimi yap.
+- 'En cok/en az' ifadelerinde ORDER BY ... DESC/ASC LIMIT 1 veya MAX/MIN kullan.
 """
 
 FEW_SHOT_EXAMPLES = """

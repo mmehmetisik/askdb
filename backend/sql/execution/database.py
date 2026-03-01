@@ -532,16 +532,37 @@ async def get_trino_schema_info() -> list:
                     pass
 
     # 2. Bos ise, tum aktif non-Trino baglantilarin tablolarini topla
+    #    ONEMLI: Tablo isimlerini Trino catalog.schema.table formatina donustur
+    #    Aksi halde duz isimler "hive" kataloğuna atanir ve hata olusur
     if not tables and _auth_adapter:
         try:
             rows = await _auth_adapter.fetch(
-                "SELECT allowed_tables FROM db_connections WHERE is_active = true AND db_type != 'trino'"
+                "SELECT name, db_type, database_name, allowed_tables "
+                "FROM db_connections WHERE is_active = true AND db_type != 'trino'"
             )
             for r in rows:
-                ts = r["allowed_tables"] if isinstance(r, dict) else r[0]
+                r = r if isinstance(r, dict) else dict(r)
+                conn_name = r["name"]
+                db_type = r.get("db_type", "postgresql")
+                db_name = r.get("database_name", "public")
+                ts = r.get("allowed_tables", "[]")
                 if ts and ts != "[]":
                     try:
-                        tables.update(_json.loads(ts))
+                        table_list = _json.loads(ts)
+                        for t in (table_list if isinstance(table_list, list) else []):
+                            if t.count(".") >= 2:
+                                # Zaten tam nitelikli (catalog.schema.table)
+                                tables.add(t)
+                            elif t.count(".") == 1:
+                                # schema.table → catalog ekle
+                                tables.add(f"{conn_name}.{t}")
+                            else:
+                                # Duz tablo adi → catalog + schema ekle
+                                if db_type in ("mysql", "mariadb"):
+                                    schema = db_name  # MySQL'de schema = database adi
+                                else:
+                                    schema = "public"  # PostgreSQL varsayilan
+                                tables.add(f"{conn_name}.{schema}.{t}")
                     except Exception:
                         pass
         except Exception as e:

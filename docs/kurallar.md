@@ -57,9 +57,9 @@ feature/* ← Takim uyelerinin calistigi branch'ler.
 
 - Her kisi **kendine ozgu** 100 sorgu hazirlar (50 tek-DB + 50 cross-DB)
 - Sorgular birbirini tekrar etmemeli — farkli tablolar, farkli sorular, farkli senaryolar
-- **TEST BASLAMADAN ONCE** hazirladigi sorgu listesini **Scrum Master'a (Gozde) onaylat**
-- Gozde onaylamadan teste baslanmaz
-- Gozde sorgu listelerini karsilastirip tekrar olmadigini kontrol eder
+- **TEST BASLAMADAN ONCE** hazirladigi sorgu listesini **Product Owner'a (Mehmet) onaylat**
+- PO onaylamadan teste baslanmaz
+- PO sorgu listelerini karsilastirip tekrar olmadigini kontrol eder
 - Onaylanan sorgu listesi degistirilemez (ek sorgular eklenebilir)
 
 ## Test Sonuclari ve Rapor Dokumantasyonu
@@ -94,11 +94,11 @@ Sablonlarda ufak tefek degisiklikler yapabilirsiniz, ancak temel yapi ve tablo f
 
 ## Sprint Bilgileri
 
-- **Sprint suresi**: 4 gun
-- **Sprint 1**: 1 Mart - 4 Mart 2026 (Pazar - Carsamba)
+- **Sprint suresi**: 7 gun
+- **Sprint 1**: 1 Mart - 7 Mart 2026 (Pazar - Cumartesi)
 - **Sprint 1 baslangic**: 1 Mart 2026, 09:00
 - **Daily standup**: Her gun saat 09:00 (Scrum Master koordine eder)
-- **Sprint review**: 4 Mart 2026 Carsamba (son gun)
+- **Sprint review**: 7 Mart 2026 Cumartesi (son gun)
 
 ## Takim Yapisi
 
