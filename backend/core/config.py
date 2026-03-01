@@ -52,6 +52,7 @@ REDIS_URL = os.getenv("REDIS_URL", "")  # ornek: redis://localhost:6379/0
 RAILWAY_API_TOKEN = os.getenv("RAILWAY_API_TOKEN", "")
 RAILWAY_PROJECT_ID = os.getenv("RAILWAY_TRINO_PROJECT_ID", "") or os.getenv("RAILWAY_PROJECT_ID", "")
 RAILWAY_TRINO_SERVICE_ID = os.getenv("RAILWAY_TRINO_SERVICE_ID", "")
+RAILWAY_TRINO_ENV_ID = os.getenv("RAILWAY_TRINO_ENV_ID", "")
 
 # ---------- TABLO ERISIM KONTROLU ----------
 def parse_tables_by_catalog(tables: set) -> dict[str, dict[str, set[str]]]:

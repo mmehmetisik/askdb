@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from backend.core.i18n import t as _t, get_lang
 from backend.core.config import (
     logger, build_dynamic_schema,
-    RAILWAY_API_TOKEN, RAILWAY_PROJECT_ID, RAILWAY_TRINO_SERVICE_ID,
+    RAILWAY_API_TOKEN, RAILWAY_PROJECT_ID, RAILWAY_TRINO_SERVICE_ID, RAILWAY_TRINO_ENV_ID,
 )
 from backend.core.models import DBConnectionCreate, DBConnectionTest, TableProfileCreate
 from backend.auth import get_current_user, require_admin
@@ -121,6 +121,9 @@ async def _railway_gql(query: str, variables: dict = None) -> dict:
 
 async def _get_railway_environment_id() -> str:
     """Railway production environment ID'sini getir."""
+    # Direkt env variable varsa API sorgusu yapmaya gerek yok
+    if RAILWAY_TRINO_ENV_ID:
+        return RAILWAY_TRINO_ENV_ID
     query = """
     query($projectId: String!) {
       project(id: $projectId) {
