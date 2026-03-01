@@ -594,7 +594,11 @@ class TrinoAdapter(DatabaseAdapter):
         self._parse_url()
 
         def _test():
-            conn = trino_pkg.dbapi.connect(**self._conn_params)
+            # Baglanti testi icin catalog belirtmeye gerek yok
+            params = dict(self._conn_params)
+            params.pop("catalog", None)
+            params.pop("schema", None)
+            conn = trino_pkg.dbapi.connect(**params)
             cur = conn.cursor()
             cur.execute("SELECT 1")
             cur.fetchone()
@@ -606,8 +610,13 @@ class TrinoAdapter(DatabaseAdapter):
     async def close(self):
         pass  # Per-query connection
 
-    def _get_conn(self):
-        return self._trino.dbapi.connect(**self._conn_params)
+    def _get_conn(self, catalog=None, schema=None):
+        params = dict(self._conn_params)
+        if catalog:
+            params["catalog"] = catalog
+        if schema:
+            params["schema"] = schema
+        return self._trino.dbapi.connect(**params)
 
     async def execute_command(self, sql: str, *args):
         raise NotImplementedError("Trino read-only. Yazma islemleri icin AUTH_DATABASE_URL kullanin.")
@@ -707,13 +716,14 @@ class TrinoAdapter(DatabaseAdapter):
             return []
 
         def _exec():
-            conn = self._get_conn()
-            try:
-                all_tables = {}
-                for catalog, schemas in ALLOWED_TABLES_BY_CATALOG.items():
-                    for schema, table_names in schemas.items():
-                        if not table_names:
-                            continue
+            all_tables = {}
+            for catalog, schemas in ALLOWED_TABLES_BY_CATALOG.items():
+                for schema, table_names in schemas.items():
+                    if not table_names:
+                        continue
+                    # Her catalog icin kendi baglantisini ac (session catalog dogrulama icin)
+                    conn = self._get_conn(catalog=catalog, schema=schema)
+                    try:
                         safe_catalog = quote_identifier(catalog)
                         safe_schema_val = schema.replace("'", "''")
                         safe_table_vals = ",".join(
@@ -751,9 +761,9 @@ class TrinoAdapter(DatabaseAdapter):
                                 "nullable": row_dict["is_nullable"] == "YES",
                                 "is_pk": False,
                             })
-                return sorted(all_tables.values(), key=lambda t: t["full_name"])
-            finally:
-                conn.close()
+                    finally:
+                        conn.close()
+            return sorted(all_tables.values(), key=lambda t: t["full_name"])
 
         return await asyncio.get_running_loop().run_in_executor(None, _exec)
 
