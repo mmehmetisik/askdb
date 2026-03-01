@@ -116,7 +116,7 @@ async def table_preview(table_name: str, request: Request, user: dict = Depends(
         if use_trino:
             db_result = await run_sql_trino(f"SELECT * FROM {safe_name}", limit=50)
         else:
-            db_result = await run_sql(f"SELECT * FROM {safe_name}", limit=50)
+            db_result = await run_sql(f"SELECT * FROM {safe_name}", limit=50, selected_tables=[table_name])
 
         from backend.sql.routes import _to_legacy_result
         return {

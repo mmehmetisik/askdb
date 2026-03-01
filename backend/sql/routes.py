@@ -114,7 +114,7 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
             db_result = await run_sql_trino(sql)
             logger.info("[TRINO] Query executed via Trino")
         else:
-            db_result = await run_sql(sql)
+            db_result = await run_sql(sql, selected_tables=tables_filter or None)
         result = _to_legacy_result(db_result, lang=get_lang(request))
         row_count = db_result["total_count"]
         logger.info(f"[OK] {row_count} rows returned" +

@@ -11,7 +11,7 @@ from backend.core.config import (
 from backend.core.models import DBConnectionCreate, DBConnectionTest, TableProfileCreate
 from backend.auth import get_current_user, require_admin
 from backend.sql.execution.database import (
-    get_auth_adapter, invalidate_dynamic_tables_cache,
+    get_auth_adapter, invalidate_dynamic_tables_cache, reinit_direct_adapters,
     activate_trino, deactivate_trino, is_trino_active, get_trino_status,
 )
 from backend.sql.cache.service import get_cache_stats, invalidate_all
@@ -298,6 +298,7 @@ async def create_db_connection(req: DBConnectionCreate, request: Request, _admin
         req.database_name, req.username, req.password, req.ssl_enabled,
     )
     invalidate_dynamic_tables_cache()
+    await reinit_direct_adapters()
     logger.info(f"[DB CONN] New connection added: {req.name} ({req.db_type})")
     return {"success": True, "message": _t("connections.created", get_lang(request))}
 
@@ -317,6 +318,7 @@ async def update_db_connection(conn_id: int, req: DBConnectionCreate, request: R
         req.database_name, req.username, req.password, req.ssl_enabled, conn_id,
     )
     invalidate_dynamic_tables_cache()
+    await reinit_direct_adapters()
     logger.info(f"[DB CONN] Connection updated: {req.name} (id={conn_id})")
     return {"success": True, "message": _t("connections.updated", get_lang(request))}
 
@@ -330,6 +332,7 @@ async def delete_db_connection(conn_id: int, request: Request, _admin: dict = De
         raise HTTPException(status_code=404, detail=_t("connections.notFound", get_lang(request)))
     await adapter.execute_command("DELETE FROM db_connections WHERE id = $1", conn_id)
     invalidate_dynamic_tables_cache()
+    await reinit_direct_adapters()
     await build_dynamic_schema()
     logger.info(f"[DB CONN] Connection deleted: id={conn_id}")
     return {"success": True, "message": _t("connections.deleted", get_lang(request))}
@@ -464,6 +467,7 @@ async def update_allowed_tables(conn_id: int, body: dict, request: Request, _adm
     )
 
     invalidate_dynamic_tables_cache()
+    await reinit_direct_adapters()
     await build_dynamic_schema()
     logger.info(f"[DB CONN] Table list updated, schema refreshed (conn_id={conn_id}, {len(tables)} tables)")
 
