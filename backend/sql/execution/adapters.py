@@ -696,9 +696,11 @@ class TrinoAdapter(DatabaseAdapter):
 
     async def get_schema_info(self, allowed_tables: set[str]) -> list:
         import asyncio
-        from backend.core.config import ALLOWED_TABLES_BY_CATALOG, DB_MODE
+        from backend.core.config import ALLOWED_TABLES_BY_CATALOG
 
-        if DB_MODE != "trino" or not ALLOWED_TABLES_BY_CATALOG:
+        # NOT: DB_MODE kontrolu kaldirildi — Trino dinamik olarak admin panelden
+        # aktif edilebilir, bu durumda DB_MODE hala "direct" olur ama Trino calisir.
+        if not ALLOWED_TABLES_BY_CATALOG:
             return []
 
         def _exec():
