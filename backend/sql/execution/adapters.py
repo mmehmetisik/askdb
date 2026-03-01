@@ -712,20 +712,22 @@ class TrinoAdapter(DatabaseAdapter):
                         if not table_names:
                             continue
                         safe_catalog = quote_identifier(catalog)
-                        safe_schema = quote_identifier(schema)
-                        placeholders = ",".join(["%s"] * len(table_names))
+                        safe_schema_val = schema.replace("'", "''")
+                        safe_table_vals = ",".join(
+                            f"'{t.replace(chr(39), chr(39)*2)}'" for t in table_names
+                        )
                         sql = f"""
                             SELECT
                                 c.table_catalog, c.table_schema, c.table_name,
                                 c.column_name, c.data_type, c.is_nullable,
                                 c.ordinal_position
                             FROM {safe_catalog}.information_schema.columns c
-                            WHERE c.table_schema = %s
-                              AND c.table_name IN ({placeholders})
+                            WHERE c.table_schema = '{safe_schema_val}'
+                              AND c.table_name IN ({safe_table_vals})
                             ORDER BY c.table_name, c.ordinal_position
                         """
                         cur = conn.cursor()
-                        cur.execute(sql, (schema, *table_names))
+                        cur.execute(sql)
                         desc = cur.description
                         columns = [d[0] for d in desc]
 
