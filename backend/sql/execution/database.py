@@ -360,6 +360,22 @@ async def reinit_direct_adapters():
     invalidate_dynamic_tables_cache()
 
 
+def get_db_type_for_tables(selected_tables: list[str] | None = None) -> str:
+    """Secilen tablolarin ait oldugu veritabani tipini dondur.
+
+    Eger tablo bir db_connection'a aitse o baglantinin db_type'ini dondurur.
+    Aksi halde ana DB_TYPE (postgresql) doner.
+    """
+    if not selected_tables:
+        return DB_TYPE
+    for table in selected_tables:
+        if table in _table_conn_map:
+            conn_id = _table_conn_map[table]
+            meta = _conn_metadata.get(conn_id, {})
+            return meta.get("db_type", DB_TYPE)
+    return DB_TYPE
+
+
 async def resolve_adapter_for_tables(selected_tables: list[str] | None = None):
     """Determine which adapter handles the given tables.
 

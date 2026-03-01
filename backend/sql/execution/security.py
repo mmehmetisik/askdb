@@ -32,11 +32,12 @@ _BLOCKED_SCHEMAS = {
 _BLOCKED_TABLES = {"app_users", "syslogins", "sysusers"}
 
 
-def _get_dialect() -> str:
-    """Determine sqlglot dialect from config."""
+def _get_dialect(db_type: str | None = None) -> str:
+    """Determine sqlglot dialect from config or explicit db_type."""
     if DB_MODE == "trino":
         return "trino"
-    return _DIALECT_MAP.get(DB_TYPE.lower(), "postgres")
+    effective = (db_type or DB_TYPE).lower()
+    return _DIALECT_MAP.get(effective, "postgres")
 
 
 def _extract_tables(parsed) -> set[str]:
@@ -65,9 +66,9 @@ def _extract_tables(parsed) -> set[str]:
     return tables
 
 
-def _check_blocked(parsed) -> bool:
+def _check_blocked(parsed, db_type: str | None = None) -> bool:
     """Check for access to blocked system schemas or tables."""
-    dialect = _get_dialect()
+    dialect = _get_dialect(db_type)
     blocked_schemas = _BLOCKED_SCHEMAS.get(dialect, set())
 
     try:
@@ -101,7 +102,7 @@ def _extract_tables_for_logging(sql: str) -> list[str]:
     return pattern.findall(sql)
 
 
-def is_safe_sql(sql: str) -> bool:
+def is_safe_sql(sql: str, db_type: str | None = None) -> bool:
     """
     Validate SQL query safety (AST parser + regex).
 
@@ -131,7 +132,7 @@ def is_safe_sql(sql: str) -> bool:
         return False
 
     # 4) Parse SQL to AST
-    dialect = _get_dialect()
+    dialect = _get_dialect(db_type)
     try:
         statements = sqlglot_parse(stripped, dialect=dialect)
     except ParseError as e:
@@ -154,7 +155,7 @@ def is_safe_sql(sql: str) -> bool:
         return False
 
     # 6) Blocked schema/table check
-    if _check_blocked(parsed):
+    if _check_blocked(parsed, db_type):
         return False
 
     # 7) Allowed table check (static + dynamic from db_connections)

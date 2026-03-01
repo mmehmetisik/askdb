@@ -25,21 +25,15 @@ def _clean_sql(sql: str) -> str:
     return sql.strip()
 
 
-def _get_dialect_name() -> str:
+def _get_dialect_name(db_type: str | None = None) -> str:
     if DB_MODE == "trino":
         return "Trino (ANSI SQL)"
-    return _DIALECT_MAP.get(DB_TYPE.lower(), "PostgreSQL")
+    effective = (db_type or DB_TYPE).lower()
+    return _DIALECT_MAP.get(effective, "PostgreSQL")
 
 
-def _get_dialect_notes() -> str:
+def _get_dialect_notes(db_type: str | None = None) -> str:
     """Dialect'e ozel notlar."""
-    dialect = DB_TYPE.lower()
-    if dialect in ("postgresql", "postgres"):
-        return "- ILIKE buyuk/kucuk harf duyarsiz arama icin kullan.\n- LIMIT ile sonuc sinirla."
-    elif dialect == "mysql":
-        return "- LIKE (case-insensitive by default in MySQL) kullan.\n- LIMIT ile sonuc sinirla.\n- Backtick (`) ile reserved kelimeleri koru."
-    elif dialect == "mssql":
-        return "- LIKE kullan (buyuk/kucuk harf duyarliligi collation'a bagli).\n- TOP N ile sonuc sinirla (LIMIT yok).\n- Tarih islemlerinde DATEADD/DATEDIFF kullan.\n- GETDATE() fonksiyonunu kullan (NOW() yok)."
     if DB_MODE == "trino":
         return (
             "- Trino ANSI SQL kullanir.\n"
@@ -50,13 +44,29 @@ def _get_dialect_notes() -> str:
             "- CAST(x AS type) ile tip donusumu yap.\n"
             "- CURRENT_DATE, CURRENT_TIMESTAMP kullan."
         )
+    dialect = (db_type or DB_TYPE).lower()
+    if dialect in ("postgresql", "postgres"):
+        return "- ILIKE buyuk/kucuk harf duyarsiz arama icin kullan.\n- LIMIT ile sonuc sinirla."
+    elif dialect in ("mysql", "mariadb"):
+        return (
+            "- ILIKE KULLANMA, MySQL'de ILIKE YOK! Metin aramasi icin LIKE kullan (MySQL LIKE zaten case-insensitive).\n"
+            "- INTERVAL 1 YEAR seklinde yaz (INTERVAL '1 year' DEGIL, tirnak kullanma).\n"
+            "- INTERVAL 7 DAY seklinde yaz (INTERVAL '7 days' DEGIL).\n"
+            "- NOW() veya CURDATE() kullan (CURRENT_DATE de calisir).\n"
+            "- LIMIT ile sonuc sinirla.\n"
+            "- Backtick (`) ile reserved kelimeleri koru.\n"
+            "- PostgreSQL syntax'i KULLANMA, bu MySQL veritabani."
+        )
+    elif dialect == "mssql":
+        return "- LIKE kullan (buyuk/kucuk harf duyarliligi collation'a bagli).\n- TOP N ile sonuc sinirla (LIMIT yok).\n- Tarih islemlerinde DATEADD/DATEDIFF kullan.\n- GETDATE() fonksiyonunu kullan (NOW() yok)."
     return ""
 
 
-async def generate_sql(question: str, selected_tables: list[str] | None = None) -> str:
+async def generate_sql(question: str, selected_tables: list[str] | None = None,
+                       db_type: str | None = None) -> str:
     schema = get_active_schema()
-    dialect = _get_dialect_name()
-    dialect_notes = _get_dialect_notes()
+    dialect = _get_dialect_name(db_type)
+    dialect_notes = _get_dialect_notes(db_type)
 
     table_hint = ""
     if selected_tables:
@@ -97,10 +107,11 @@ SQL:"""
     return result
 
 
-async def retry_safe_sql(question: str, bad_sql: str) -> str:
+async def retry_safe_sql(question: str, bad_sql: str,
+                         db_type: str | None = None) -> str:
     """Tehlikeli SQL geldiginde LLM'den sadece SELECT sorgusu iste."""
     schema = get_active_schema()
-    dialect = _get_dialect_name()
+    dialect = _get_dialect_name(db_type)
 
     prompt = f"""Onceki sorgun tehlikeli komutlar iceriyordu ve REDDEDILDI:
 {bad_sql}
@@ -128,10 +139,11 @@ Guvenli SQL:"""
 
 
 async def retry_fix_sql(question: str, bad_sql: str, error_msg: str,
-                        selected_tables: list[str] | None = None) -> str:
+                        selected_tables: list[str] | None = None,
+                        db_type: str | None = None) -> str:
     """SQL calistirilirken hata alindiysa, hatayi LLM'e gosterip duzeltmesini iste."""
     schema = get_active_schema()
-    dialect = _get_dialect_name()
+    dialect = _get_dialect_name(db_type)
 
     table_hint = ""
     if selected_tables:

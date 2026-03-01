@@ -7,7 +7,7 @@ from backend.core.config import logger
 from backend.core.models import QueryRequest, ExecuteSQLRequest
 from backend.auth import get_current_user
 from backend.sql.execution.database import (
-    run_sql, is_trino_active, run_sql_trino, log_query,
+    run_sql, is_trino_active, run_sql_trino, log_query, get_db_type_for_tables,
 )
 from backend.sql.execution.security import is_safe_sql
 from backend.sql.llm.service import generate_sql, retry_safe_sql, retry_fix_sql
@@ -75,22 +75,26 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
     _start_time = _time.time()
 
     try:
+        # Hedef veritabani tipini coz (mysql, postgresql, vb.)
+        target_db_type = get_db_type_for_tables(tables_filter or None)
         logger.info(f"[QUERY] user={user['username']} | question={question}" +
-                     (f" | tables={tables_filter}" if tables_filter else ""))
+                     (f" | tables={tables_filter}" if tables_filter else "") +
+                     f" | db_type={target_db_type}")
         await emit_progress(session_id, "llm_generating", progress=30)
-        sql = await generate_sql(question, selected_tables=tables_filter or None)
+        sql = await generate_sql(question, selected_tables=tables_filter or None,
+                                 db_type=target_db_type)
         logger.info(f"[SQL GENERATED] {sql}")
 
         # Security check + retry
         await emit_progress(session_id, "sql_validating", progress=60)
         attempts = 0
-        while not is_safe_sql(sql) and attempts < 3:
+        while not is_safe_sql(sql, db_type=target_db_type) and attempts < 3:
             attempts += 1
             logger.warning(f"[UNSAFE SQL] attempt {attempts}/3 - rejected: {sql}")
-            sql = await retry_safe_sql(question, sql)
+            sql = await retry_safe_sql(question, sql, db_type=target_db_type)
             logger.info(f"[SQL RETRY] attempt {attempts} -> {sql}")
 
-        if not is_safe_sql(sql):
+        if not is_safe_sql(sql, db_type=target_db_type):
             logger.error("[FAILED] Could not generate safe SQL in 3 attempts")
             elapsed_ms = int((_time.time() - _start_time) * 1000)
             asyncio.create_task(log_query(
@@ -132,9 +136,10 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
                 if exec_attempts <= max_exec_retries:
                     # LLM'den hataya gore SQL duzeltmesini iste
                     sql = await retry_fix_sql(question, sql, f"{err_name}: {exec_err}",
-                                              selected_tables=tables_filter or None)
+                                              selected_tables=tables_filter or None,
+                                              db_type=target_db_type)
                     logger.info(f"[SQL RETRY FIX] new SQL: {sql}")
-                    if not is_safe_sql(sql):
+                    if not is_safe_sql(sql, db_type=target_db_type):
                         logger.error(f"[SQL RETRY FIX] Retried SQL is unsafe, stopping")
                         break
 
