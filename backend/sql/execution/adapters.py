@@ -203,10 +203,13 @@ class MySQLAdapter(DatabaseAdapter):
     async def init(self):
         import aiomysql
         params = self._parse_url()
-        # SSL destegi (TiDB Cloud vb. icin gerekli)
+        # SSL destegi (TiDB Cloud, Aiven vb. icin gerekli)
         if self.ssl_enabled:
             import ssl as _ssl
             ssl_ctx = _ssl.create_default_context()
+            # Aiven gibi self-signed sertifika kullanan servisler icin
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = _ssl.CERT_NONE
             params["ssl"] = ssl_ctx
         self.pool = await aiomysql.create_pool(
             minsize=2, maxsize=10, connect_timeout=30, **params
