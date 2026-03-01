@@ -109,7 +109,14 @@ async def _railway_gql(query: str, variables: dict = None) -> dict:
         payload["variables"] = variables
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(RAILWAY_GQL_URL, json=payload, headers=headers)
-        return resp.json()
+        if resp.status_code != 200:
+            logger.error(f"[RAILWAY] API HTTP {resp.status_code}: {resp.text[:500]}")
+            return {"errors": [{"message": f"Railway API HTTP {resp.status_code}: {resp.text[:200]}"}]}
+        try:
+            return resp.json()
+        except Exception:
+            logger.error(f"[RAILWAY] Invalid JSON response: {resp.text[:500]}")
+            return {"errors": [{"message": f"Railway API gecersiz yanit: {resp.text[:200]}"}]}
 
 
 async def _get_railway_environment_id() -> str:
