@@ -173,8 +173,8 @@ async def trino_railway_status(_admin: dict = Depends(require_admin)):
         return {"success": False, "configured": True, "running": False,
                 "message": str(result["errors"])}
 
-    service = result.get("data", {}).get("service", {})
-    edges = service.get("deployments", {}).get("edges", [])
+    service = (result.get("data") or {}).get("service") or {}
+    edges = (service.get("deployments") or {}).get("edges", [])
 
     if not edges:
         return {"success": True, "configured": True, "running": False,
@@ -217,11 +217,8 @@ async def trino_railway_stop(_admin: dict = Depends(require_admin)):
     """
     result = await _railway_gql(status_query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
     edges = (
-        result.get("data", {})
-        .get("service", {})
-        .get("deployments", {})
-        .get("edges", [])
-    )
+        (result.get("data") or {}).get("service") or {}
+    ).get("deployments", {}).get("edges", [])
     if not edges:
         raise HTTPException(status_code=400, detail="Aktif Trino deployment bulunamadi.")
 
@@ -268,6 +265,8 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
     """Railway'deki Trino servisini baslat (admin-only)."""
     if not RAILWAY_API_TOKEN:
         raise HTTPException(status_code=400, detail="Railway API token yapilandirilmamis.")
+    if not RAILWAY_TRINO_SERVICE_ID:
+        raise HTTPException(status_code=400, detail="RAILWAY_TRINO_SERVICE_ID yapilandirilmamis.")
 
     env_id = await _get_railway_environment_id()
     logger.info(f"[RAILWAY START] token={RAILWAY_API_TOKEN[:8]}..., service={RAILWAY_TRINO_SERVICE_ID}, env={env_id}")
@@ -306,12 +305,10 @@ async def trino_railway_start(_admin: dict = Depends(require_admin)):
     }
     """
     status_result = await _railway_gql(status_query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
+    data = status_result.get("data") or {}
     edges = (
-        status_result.get("data", {})
-        .get("service", {})
-        .get("deployments", {})
-        .get("edges", [])
-    )
+        data.get("service") or {}
+    ).get("deployments", {}).get("edges", [])
 
     if edges:
         deployment_id = edges[0]["node"]["id"]
