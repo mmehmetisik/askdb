@@ -67,8 +67,13 @@ async function fetchConnections() {
                         '<button class="btn-sm danger" onclick="deleteConnection(' + c.id + ')"><i class="fas fa-trash"></i></button>' +
                     "</div>" +
                 "</div>" +
+                (isTrino ? '<div id="railway-status-' + c.id + '" class="railway-status-section"></div>' : '') +
                 '<div id="discover-' + c.id + '"></div>';
             }).join("");
+            // Railway status kontrolu — Trino kartlari icin
+            data.connections.forEach(function (c) {
+                if (c.db_type === "trino") fetchRailwayStatus(c.id);
+            });
         } else {
             container.innerHTML = '<p style="text-align:center; color: var(--text-muted); padding: 20px;">' + t("common.noResults") + '</p>';
         }
@@ -109,6 +114,74 @@ async function restartTrino() {
     } catch (e) {
         alert("Baglanti hatasi: " + e.message);
         fetchConnections();
+    }
+}
+
+async function fetchRailwayStatus(connId) {
+    var container = document.getElementById("railway-status-" + connId);
+    if (!container) return;
+    try {
+        var res = await fetch(API_BASE + "/api/trino/railway/status", { headers: getAuthHeaders(), credentials: "include" });
+        var data = await res.json();
+        if (!data.configured) { container.innerHTML = ""; return; }
+
+        var statusColor, statusText, actionBtn;
+        if (data.running) {
+            statusColor = "#4ade80";
+            statusText = '<i class="fas fa-circle" style="font-size:0.6rem;color:#4ade80;"></i> Railway: <strong>Calisiyor</strong>';
+            actionBtn = '<button class="btn-sm" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;padding:6px 14px !important;" onclick="stopRailwayTrino()"><i class="fas fa-stop"></i> Servisi Durdur</button>';
+        } else if (data.deploying) {
+            statusColor = "#f59e0b";
+            statusText = '<i class="fas fa-spinner fa-spin" style="font-size:0.6rem;color:#f59e0b;"></i> Railway: <strong>Deploy ediliyor...</strong>';
+            actionBtn = '<button class="btn-sm" disabled style="opacity:0.5;padding:6px 14px !important;"><i class="fas fa-hourglass-half"></i> Bekleniyor</button>';
+        } else {
+            statusColor = "#ef4444";
+            statusText = '<i class="fas fa-circle" style="font-size:0.6rem;color:#ef4444;"></i> Railway: <strong>Durduruldu</strong> <span style="font-size:0.75rem;color:#4ade80;">(para yazmiyor)</span>';
+            actionBtn = '<button class="btn-sm" style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;padding:6px 14px !important;" onclick="startRailwayTrino()"><i class="fas fa-play"></i> Servisi Baslat</button>';
+        }
+
+        container.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;margin:0 0 8px 0;background:rgba(100,100,140,0.1);border-radius:10px;border:1px solid rgba(100,100,140,0.15);">' +
+            '<span style="font-size:0.85rem;color:var(--text-secondary);">' + statusText + '</span>' +
+            '<div style="display:flex;gap:8px;align-items:center;">' +
+                actionBtn +
+                '<button class="btn-sm" style="padding:6px 10px !important;background:rgba(100,100,140,0.15);color:var(--text-secondary);" onclick="fetchRailwayStatus(' + connId + ')"><i class="fas fa-sync-alt"></i></button>' +
+            '</div>' +
+        '</div>';
+    } catch (e) {
+        container.innerHTML = "";
+        console.error("Railway status check failed", e);
+    }
+}
+
+async function stopRailwayTrino() {
+    if (!confirm("Trino servisi Railway'de durdurulacak.\n\n• Cross-DB sorgulari calismayacak\n• Para yazmayacak\n\nDevam edilsin mi?")) return;
+    try {
+        var res = await fetch(API_BASE + "/api/trino/railway/stop", { method: "POST", headers: getAuthHeaders(), credentials: "include" });
+        var data = await res.json();
+        if (data.success) {
+            alert(data.message);
+            fetchConnections();
+        } else {
+            alert(data.detail || data.message || "Durdurma basarisiz.");
+        }
+    } catch (e) {
+        alert("Baglanti hatasi: " + e.message);
+    }
+}
+
+async function startRailwayTrino() {
+    if (!confirm("Trino servisi Railway'de baslatilacak.\n\nDeploy 1-2 dakika surebilir.\nDevam edilsin mi?")) return;
+    try {
+        var res = await fetch(API_BASE + "/api/trino/railway/start", { method: "POST", headers: getAuthHeaders(), credentials: "include" });
+        var data = await res.json();
+        if (data.success) {
+            alert(data.message);
+            fetchConnections();
+        } else {
+            alert(data.detail || data.message || "Baslatma basarisiz.");
+        }
+    } catch (e) {
+        alert("Baglanti hatasi: " + e.message);
     }
 }
 

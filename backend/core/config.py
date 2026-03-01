@@ -48,6 +48,11 @@ RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
 # ---------- REDIS (opsiyonel) ----------
 REDIS_URL = os.getenv("REDIS_URL", "")  # ornek: redis://localhost:6379/0
 
+# ---------- RAILWAY API (Trino servis kontrolu) ----------
+RAILWAY_API_TOKEN = os.getenv("RAILWAY_API_TOKEN", "")
+RAILWAY_PROJECT_ID = os.getenv("RAILWAY_PROJECT_ID", "")
+RAILWAY_TRINO_SERVICE_ID = os.getenv("RAILWAY_TRINO_SERVICE_ID", "")
+
 # ---------- TABLO ERISIM KONTROLU ----------
 def parse_tables_by_catalog(tables: set) -> dict[str, dict[str, set[str]]]:
     """Parse any table set into Trino catalog structure (catalog.schema.table)."""

@@ -1,9 +1,13 @@
 import json
 
+import httpx
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from backend.core.i18n import t as _t, get_lang
-from backend.core.config import logger, build_dynamic_schema
+from backend.core.config import (
+    logger, build_dynamic_schema,
+    RAILWAY_API_TOKEN, RAILWAY_PROJECT_ID, RAILWAY_TRINO_SERVICE_ID,
+)
 from backend.core.models import DBConnectionCreate, DBConnectionTest, TableProfileCreate
 from backend.auth import get_current_user, require_admin
 from backend.sql.execution.database import (
@@ -85,6 +89,190 @@ async def trino_status_endpoint(user: dict = Depends(get_current_user)):
     else:
         status["user_has_access"] = bool(user.get("trino_access", False))
     return status
+
+
+# ── Railway Trino Service Control ──
+
+RAILWAY_GQL_URL = "https://backboard.railway.app/graphql/v2"
+
+
+async def _railway_gql(query: str, variables: dict = None) -> dict:
+    """Railway GraphQL API call."""
+    if not RAILWAY_API_TOKEN:
+        return {"errors": [{"message": "RAILWAY_API_TOKEN not configured"}]}
+    headers = {
+        "Authorization": f"Bearer {RAILWAY_API_TOKEN}",
+        "Content-Type": "application/json",
+    }
+    payload: dict = {"query": query}
+    if variables:
+        payload["variables"] = variables
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(RAILWAY_GQL_URL, json=payload, headers=headers)
+        return resp.json()
+
+
+async def _get_railway_environment_id() -> str:
+    """Railway production environment ID'sini getir."""
+    query = """
+    query($projectId: String!) {
+      project(id: $projectId) {
+        environments {
+          edges {
+            node { id name }
+          }
+        }
+      }
+    }
+    """
+    result = await _railway_gql(query, {"projectId": RAILWAY_PROJECT_ID})
+    edges = (
+        result.get("data", {})
+        .get("project", {})
+        .get("environments", {})
+        .get("edges", [])
+    )
+    for edge in edges:
+        node = edge.get("node", {})
+        if node.get("name", "").lower() == "production":
+            return node["id"]
+    return edges[0]["node"]["id"] if edges else ""
+
+
+@router.get("/trino/railway/status")
+async def trino_railway_status(_admin: dict = Depends(require_admin)):
+    """Railway'deki Trino servisinin durumunu kontrol et (admin-only)."""
+    if not RAILWAY_API_TOKEN:
+        return {"success": True, "configured": False, "running": False}
+
+    query = """
+    query($serviceId: String!) {
+      service(id: $serviceId) {
+        name
+        deployments(first: 1) {
+          edges {
+            node { id status createdAt }
+          }
+        }
+      }
+    }
+    """
+    result = await _railway_gql(query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
+
+    if "errors" in result and not result.get("data"):
+        return {"success": False, "configured": True, "running": False,
+                "message": str(result["errors"])}
+
+    service = result.get("data", {}).get("service", {})
+    edges = service.get("deployments", {}).get("edges", [])
+
+    if not edges:
+        return {"success": True, "configured": True, "running": False,
+                "status": "NO_DEPLOYMENT", "service_name": service.get("name", "")}
+
+    latest = edges[0]["node"]
+    status = latest["status"]
+    running = status in ("SUCCESS",)
+    deploying = status in ("DEPLOYING", "BUILDING", "INITIALIZING", "WAITING")
+
+    return {
+        "success": True,
+        "configured": True,
+        "running": running,
+        "deploying": deploying,
+        "status": status,
+        "deployment_id": latest["id"],
+        "service_name": service.get("name", ""),
+        "created_at": latest.get("createdAt", ""),
+    }
+
+
+@router.post("/trino/railway/stop")
+async def trino_railway_stop(_admin: dict = Depends(require_admin)):
+    """Railway'deki Trino servisini durdur — para yazmayi keser (admin-only)."""
+    if not RAILWAY_API_TOKEN:
+        raise HTTPException(status_code=400, detail="Railway API token yapilandirilmamis.")
+
+    # En son deployment'i bul
+    status_query = """
+    query($serviceId: String!) {
+      service(id: $serviceId) {
+        deployments(first: 1) {
+          edges {
+            node { id status }
+          }
+        }
+      }
+    }
+    """
+    result = await _railway_gql(status_query, {"serviceId": RAILWAY_TRINO_SERVICE_ID})
+    edges = (
+        result.get("data", {})
+        .get("service", {})
+        .get("deployments", {})
+        .get("edges", [])
+    )
+    if not edges:
+        raise HTTPException(status_code=400, detail="Aktif Trino deployment bulunamadi.")
+
+    deployment_id = edges[0]["node"]["id"]
+
+    # Deployment'i kaldir
+    remove_mutation = """
+    mutation($id: String!) {
+      deploymentRemove(id: $id)
+    }
+    """
+    result = await _railway_gql(remove_mutation, {"id": deployment_id})
+
+    if "errors" in result and not result.get("data"):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Railway API hatasi: {result['errors']}",
+        )
+
+    # AskDB tarafinda da Trino'yu deaktif et
+    try:
+        trino_st = get_trino_status()
+        if trino_st.get("active"):
+            await deactivate_trino()
+            invalidate_dynamic_tables_cache()
+            await build_dynamic_schema()
+    except Exception:
+        pass
+
+    logger.info("[RAILWAY] Trino service stopped on Railway")
+    return {"success": True, "message": "Trino servisi durduruldu. Artik para yazmiyor."}
+
+
+@router.post("/trino/railway/start")
+async def trino_railway_start(_admin: dict = Depends(require_admin)):
+    """Railway'deki Trino servisini baslat (admin-only)."""
+    if not RAILWAY_API_TOKEN:
+        raise HTTPException(status_code=400, detail="Railway API token yapilandirilmamis.")
+
+    env_id = await _get_railway_environment_id()
+    if not env_id:
+        raise HTTPException(status_code=500, detail="Railway environment ID bulunamadi.")
+
+    redeploy_mutation = """
+    mutation($serviceId: String!, $environmentId: String!) {
+      serviceInstanceRedeploy(serviceId: $serviceId, environmentId: $environmentId)
+    }
+    """
+    result = await _railway_gql(redeploy_mutation, {
+        "serviceId": RAILWAY_TRINO_SERVICE_ID,
+        "environmentId": env_id,
+    })
+
+    if "errors" in result and not result.get("data"):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Railway API hatasi: {result['errors']}",
+        )
+
+    logger.info("[RAILWAY] Trino service started on Railway")
+    return {"success": True, "message": "Trino servisi baslatildi. Deploy 1-2 dakika surebilir."}
 
 
 # ── DB Connections ──
