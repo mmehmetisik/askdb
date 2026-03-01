@@ -39,8 +39,12 @@ async function fetchConnections() {
                 }
 
                 var dashboardBtn = "";
+                var restartBtn = "";
                 if (isTrino) {
                     dashboardBtn = '<button class="btn-sm purple" onclick="window.open(\'https://' + escapeHtml(c.host) + "/ui/'" + ', \'_blank\')"><i class="fas fa-tachometer-alt"></i> Dashboard</button>';
+                }
+                if (isTrinoActive) {
+                    restartBtn = '<button class="btn-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;" onclick="restartTrino()"><i class="fas fa-sync-alt"></i> Restart</button>';
                 }
 
                 return '<div class="conn-card' + (isTrinoActive ? " trino-active" : "") + '" style="' + (isTrinoActive ? "border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.05);" : "") + '">' +
@@ -57,6 +61,7 @@ async function fetchConnections() {
                     "</div>" +
                     '<div class="conn-actions">' +
                         trinoSwitch +
+                        restartBtn +
                         dashboardBtn +
                         '<button class="btn-sm info" onclick="discoverTables(' + c.id + ')"><i class="fas fa-search"></i> ' + t("admin.connections.discover") + '</button>' +
                         '<button class="btn-sm danger" onclick="deleteConnection(' + c.id + ')"><i class="fas fa-trash"></i></button>' +
@@ -85,6 +90,24 @@ async function toggleTrino(connId, activate) {
         }
     } catch (e) {
         alert(t("common.connectionError") + ": " + e.message);
+        fetchConnections();
+    }
+}
+
+async function restartTrino() {
+    if (!confirm("Trino baglantisi yeniden baslatilacak. Devam edilsin mi?")) return;
+    try {
+        var res = await fetch(API_BASE + "/api/trino/restart", { method: "POST", headers: getAuthHeaders(), credentials: "include" });
+        var data = await res.json();
+        if (data.success) {
+            alert("Trino basariyla yeniden baslatildi!");
+            fetchConnections();
+        } else {
+            alert(data.detail || data.message || "Restart basarisiz.");
+            fetchConnections();
+        }
+    } catch (e) {
+        alert("Baglanti hatasi: " + e.message);
         fetchConnections();
     }
 }

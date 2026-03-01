@@ -61,6 +61,21 @@ async def deactivate_trino_endpoint(request: Request, _admin: dict = Depends(req
     return {"success": True, "message": _t("trino.deactivated", get_lang(request))}
 
 
+@router.post("/trino/restart")
+async def restart_trino_endpoint(request: Request, _admin: dict = Depends(require_admin)):
+    """Trino baglantisini yeniden baslat (deactivate + activate) (admin-only)."""
+    status = get_trino_status()
+    conn_id = status.get("conn_id")
+    if not conn_id:
+        raise HTTPException(status_code=400, detail="Aktif Trino baglantisi yok. Restart yapilamaz.")
+    await deactivate_trino()
+    invalidate_dynamic_tables_cache()
+    result = await activate_trino(conn_id)
+    await build_dynamic_schema()
+    logger.info(f"Trino restarted: conn_id={conn_id}")
+    return {"success": True, "message": "Trino baglantisi yeniden baslatildi.", "connection": result}
+
+
 @router.get("/trino/status")
 async def trino_status_endpoint(user: dict = Depends(get_current_user)):
     """Trino durumunu dondur."""
