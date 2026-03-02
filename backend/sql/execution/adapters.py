@@ -587,35 +587,48 @@ class TrinoAdapter(DatabaseAdapter):
         import trino as trino_pkg
         self._trino = trino_pkg
         self._parse_url()
+        self._fallback_catalog = None
+        self._fallback_schema = None
 
         def _test():
-            # Baglanti testi icin catalog belirtmeye gerek yok
             params = dict(self._conn_params)
             params.pop("catalog", None)
             params.pop("schema", None)
             conn = trino_pkg.dbapi.connect(**params)
             cur = conn.cursor()
-            cur.execute("SELECT 1")
-            cur.fetchone()
+            # Baglanti testi + mevcut catalog'lari kesfet
+            cur.execute("SHOW CATALOGS")
+            catalogs = [row[0] for row in cur.fetchall()]
             conn.close()
+            return catalogs
 
-        await asyncio.get_running_loop().run_in_executor(None, _test)
-        logger.info(f"[TRINO] Connection successful: {self._conn_params['host']}:{self._conn_params['port']}/{self._default_catalog}")
+        catalogs = await asyncio.get_running_loop().run_in_executor(None, _test)
+        # Ilk gercek catalog'u varsayilan olarak ayarla (system/jmx haric)
+        for cat in catalogs:
+            if cat not in ("system", "jmx"):
+                self._fallback_catalog = cat
+                self._fallback_schema = "public"  # PostgreSQL icin; MySQL icin schema_info duzeltir
+                break
+        logger.info(f"[TRINO] Connection successful. Catalogs: {catalogs}, fallback: {self._fallback_catalog}")
 
     async def close(self):
         pass  # Per-query connection
 
     def _get_conn(self, catalog=None, schema=None):
         params = dict(self._conn_params)
-        # Varsayilan catalog/schema her zaman cikarilir; sadece
-        # acikca verilen degerler eklenir (session context icin).
-        # Boylece gecersiz varsayilan ("hive") Trino'ya gonderilmez.
+        # Gecersiz varsayilan ("hive") her zaman cikarilir
         params.pop("catalog", None)
         params.pop("schema", None)
+        # Acikca verilen catalog/schema kullan
         if catalog:
             params["catalog"] = catalog
+        elif self._fallback_catalog:
+            # LLM bare tablo adi uretirse en azindan session catalog var
+            params["catalog"] = self._fallback_catalog
         if schema:
             params["schema"] = schema
+        elif self._fallback_schema and "catalog" in params:
+            params["schema"] = self._fallback_schema
         return self._trino.dbapi.connect(**params)
 
     async def execute_command(self, sql: str, *args):

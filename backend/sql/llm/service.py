@@ -36,9 +36,14 @@ def _get_dialect_notes(db_type: str | None = None) -> str:
     """Dialect'e ozel notlar."""
     if DB_MODE == "trino":
         return (
+            "!! KRITIK: Trino'da tablo adlari HER ZAMAN catalog.schema.table formatinda yazilmali!\n"
+            "- YANLIS: FROM customers → HATA VERIR!\n"
+            "- YANLIS: FROM public.customers → HATA VERIR!\n"
+            "- DOGRU:  FROM musteri_pg.public.customers\n"
+            "- Schema'daki CREATE TABLE satirlarindaki tam isimleri AYNEN kullan.\n"
+            "- JOIN yaparken de tam isim kullan: JOIN finans_mysql.defaultdb.credit_scores cs ON ...\n"
             "- Trino ANSI SQL kullanir.\n"
             "- LIMIT ile sonuc sinirla.\n"
-            "- Tablo adlarini catalog.schema.table formatinda yaz.\n"
             "- LOWER() ile buyuk/kucuk harf duyarsiz arama yap.\n"
             "- Sadece SELECT sorgusu yaz, Trino read-only.\n"
             "- CAST(x AS type) ile tip donusumu yap.\n"
@@ -149,6 +154,15 @@ async def retry_fix_sql(question: str, bad_sql: str, error_msg: str,
     if selected_tables:
         table_hint = f"\nKullanicinin sectigi tablolar: {', '.join(selected_tables)}. SADECE bu tablolardaki sutunlari kullan.\n"
 
+    trino_warning = ""
+    if DB_MODE == "trino":
+        trino_warning = (
+            "\n!! KRITIK: Trino'da tablo adlari HER ZAMAN catalog.schema.table formatinda yazilmali!"
+            "\n- YANLIS: FROM customers → HATA VERIR"
+            "\n- DOGRU:  FROM musteri_pg.public.customers"
+            "\n- Schema'daki CREATE TABLE satirlarindaki tam isimleri AYNEN kullan.\n"
+        )
+
     prompt = f"""Onceki SQL sorgun veritabaninda calistirilirken HATA aldi:
 
 SQL: {bad_sql}
@@ -159,7 +173,7 @@ BU HATAYI DUZELT. Kurallar:
 - Schema'da OLMAYAN tablo veya sutun ASLA kullanma.
 - Sadece SELECT sorgusu yaz. Aciklama yazma. Markdown kullanma.
 - Veritabani tipi: {dialect}
-{table_hint}
+{trino_warning}{table_hint}
 [VERITABANI SEMASI]
 {schema}
 
