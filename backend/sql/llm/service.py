@@ -69,13 +69,21 @@ def _get_dialect_name(db_type: str | None = None) -> str:
 def _get_dialect_notes(db_type: str | None = None) -> str:
     """Dialect'e ozel notlar."""
     if DB_MODE == "trino":
+        # Dinamik ornek olustur (hardcode tablo adi yok)
+        from backend.core.config import TRINO_TABLE_MAP
+        example = ""
+        if TRINO_TABLE_MAP:
+            first_bare = next(iter(TRINO_TABLE_MAP))
+            first_full = TRINO_TABLE_MAP[first_bare]
+            example = (
+                f"- YANLIS: FROM {first_bare} → HATA VERIR!\n"
+                f"- DOGRU:  FROM {first_full}\n"
+            )
         return (
             "!! KRITIK: Trino'da tablo adlari HER ZAMAN catalog.schema.table formatinda yazilmali!\n"
-            "- YANLIS: FROM customers → HATA VERIR!\n"
-            "- YANLIS: FROM public.customers → HATA VERIR!\n"
-            "- DOGRU:  FROM musteri_pg.public.customers\n"
+            f"{example}"
             "- Schema'daki CREATE TABLE satirlarindaki tam isimleri AYNEN kullan.\n"
-            "- JOIN yaparken de tam isim kullan: JOIN finans_mysql.defaultdb.credit_scores cs ON ...\n"
+            "- JOIN yaparken de tam isim kullan.\n"
             "- Trino ANSI SQL kullanir.\n"
             "- LIMIT ile sonuc sinirla.\n"
             "- LOWER() ile buyuk/kucuk harf duyarsiz arama yap.\n"
@@ -190,10 +198,15 @@ async def retry_fix_sql(question: str, bad_sql: str, error_msg: str,
 
     trino_warning = ""
     if DB_MODE == "trino":
+        from backend.core.config import TRINO_TABLE_MAP
+        example = ""
+        if TRINO_TABLE_MAP:
+            first_bare = next(iter(TRINO_TABLE_MAP))
+            first_full = TRINO_TABLE_MAP[first_bare]
+            example = f"\n- YANLIS: FROM {first_bare}\n- DOGRU:  FROM {first_full}"
         trino_warning = (
             "\n!! KRITIK: Trino'da tablo adlari HER ZAMAN catalog.schema.table formatinda yazilmali!"
-            "\n- YANLIS: FROM customers → HATA VERIR"
-            "\n- DOGRU:  FROM musteri_pg.public.customers"
+            f"{example}"
             "\n- Schema'daki CREATE TABLE satirlarindaki tam isimleri AYNEN kullan.\n"
         )
 

@@ -202,15 +202,23 @@ async def build_dynamic_schema() -> str:
         DYNAMIC_SCHEMA = "\n\n".join(lines)
 
         # Trino table map: bare_name -> full_name (SQL post-processing icin)
+        # Ayni isimde tablo birden fazla catalog'da varsa EKLENMEZ (belirsizlik riski)
         global TRINO_TABLE_MAP
-        TRINO_TABLE_MAP = {}
+        _temp_map: dict[str, str] = {}
+        _duplicates: set[str] = set()
         for table in tables:
             fn = table.get("full_name")
             bn = table.get("name")
             if fn and bn and fn.count(".") == 2:
-                TRINO_TABLE_MAP[bn] = fn
+                if bn in _temp_map and _temp_map[bn] != fn:
+                    _duplicates.add(bn)  # ayni isim, farkli catalog
+                _temp_map[bn] = fn
+        # Cakisan isimleri cikar — bunlar icin LLM tam isim kullanmak ZORUNDA
+        TRINO_TABLE_MAP = {k: v for k, v in _temp_map.items() if k not in _duplicates}
+        if _duplicates:
+            logger.warning(f"[SCHEMA] Trino table name conflicts (skipped): {_duplicates}")
         if TRINO_TABLE_MAP:
-            logger.info(f"[SCHEMA] Trino table map: {list(TRINO_TABLE_MAP.keys())}")
+            logger.info(f"[SCHEMA] Trino table map ({len(TRINO_TABLE_MAP)} tables): {list(TRINO_TABLE_MAP.keys())}")
 
         profiled = sum(len(v) for v in profiles.values())
         logger.info(f"[SCHEMA] Dynamic schema built ({len(tables)} tables, {profiled} profiled columns)")
