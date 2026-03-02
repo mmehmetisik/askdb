@@ -73,6 +73,7 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
 
     response.headers["X-Cache"] = "MISS"
     _start_time = _time.time()
+    sql = None  # hata durumunda bile uretilen SQL'i korumak icin
 
     try:
         # Hedef veritabani tipini coz (mysql, postgresql, vb.)
@@ -161,18 +162,21 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
         ))
 
     except Exception as e:
-        logger.error(f"[ERROR] {type(e).__name__}: {e}")
+        err_name = type(e).__name__
+        err_msg = str(e)[:500] if str(e) else err_name
+        logger.error(f"[ERROR] {err_name}: {e}")
         elapsed_ms = int((_time.time() - _start_time) * 1000)
+        display_sql = sql or "HATA"
         asyncio.create_task(log_query(
-            username=user["username"], question=question, generated_sql="HATA",
+            username=user["username"], question=question, generated_sql=display_sql,
             execution_time_ms=elapsed_ms, row_count=0, is_trino=False,
-            is_cached=False, status="error", error_message=str(e)[:500],
+            is_cached=False, status="error", error_message=err_msg,
             tables_used=tables_filter,
         ))
         return {
             "question": question,
-            "sql": "HATA",
-            "result": [[_t("query.errorHeader", get_lang(request))], [_t("query.processingError", get_lang(request), error=type(e).__name__)]],
+            "sql": display_sql,
+            "result": [[_t("query.errorHeader", get_lang(request))], [f"{err_name}: {err_msg}"]],
             "column_types": [],
             "truncated": False,
         }
