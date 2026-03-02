@@ -1,8 +1,42 @@
+import re
 from backend.core.config import BUSINESS_LOGIC, FEW_SHOT_EXAMPLES, DB_TYPE, DB_MODE, logger, get_active_schema
 from .providers import build_llm_chain
 
 # LLM zincirini baslat
 _chain = build_llm_chain()
+
+
+def qualify_trino_tables(sql: str) -> str:
+    """LLM bare tablo adlari uretirse, Trino icin catalog.schema.table formatina donustur.
+
+    Ornek: FROM customers c → FROM musteri_pg.public.customers c
+    """
+    from backend.core.config import TRINO_TABLE_MAP
+    if not TRINO_TABLE_MAP:
+        return sql
+
+    def _replacer(match):
+        keyword = match.group(1)     # FROM / JOIN + bosluk
+        table_name = match.group(2)  # bare tablo adi
+        rest = match.group(3)        # sonraki bosluk/karakter
+        qualified = TRINO_TABLE_MAP.get(table_name.lower())
+        if qualified:
+            return f"{keyword}{qualified}{rest}"
+        return match.group(0)  # degistirme
+
+    # FROM|JOIN sonrasi gelen bare tablo adlarini yakala
+    # Zaten nitelikli olanlar (nokta iceren) eslesmez cunku \w noktayi icermez
+    result = re.sub(
+        r'((?:FROM|JOIN)\s+)(\w+)(\s)',
+        _replacer,
+        sql,
+        flags=re.IGNORECASE,
+    )
+
+    if result != sql:
+        logger.info(f"[TRINO QUALIFY] Bare table names replaced: {sql.strip()[:80]}... -> {result.strip()[:80]}...")
+
+    return result
 
 # Dialect bilgisi
 _DIALECT_MAP = {

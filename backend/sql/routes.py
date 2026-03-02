@@ -10,7 +10,7 @@ from backend.sql.execution.database import (
     run_sql, is_trino_active, run_sql_trino, log_query, get_db_type_for_tables,
 )
 from backend.sql.execution.security import is_safe_sql
-from backend.sql.llm.service import generate_sql, retry_safe_sql, retry_fix_sql
+from backend.sql.llm.service import generate_sql, retry_safe_sql, retry_fix_sql, qualify_trino_tables
 from backend.sql.cache.service import cache_key, get_cached, set_cached
 from backend.sql.rate_limit import check_rate_limit
 from backend.core.i18n import t as _t, get_lang
@@ -84,6 +84,9 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
         await emit_progress(session_id, "llm_generating", progress=30)
         sql = await generate_sql(question, selected_tables=tables_filter or None,
                                  db_type=target_db_type)
+        # Trino: LLM bare tablo adlari uretirse otomatik duzelt
+        if is_trino_active() and _user_has_trino(user):
+            sql = qualify_trino_tables(sql)
         logger.info(f"[SQL GENERATED] {sql}")
 
         # Security check + retry
@@ -139,6 +142,9 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
                     sql = await retry_fix_sql(question, sql, f"{err_name}: {exec_err}",
                                               selected_tables=tables_filter or None,
                                               db_type=target_db_type)
+                    # Trino: retry sonrasi da bare tablo adlarini duzelt
+                    if use_trino:
+                        sql = qualify_trino_tables(sql)
                     logger.info(f"[SQL RETRY FIX] new SQL: {sql}")
                     if not is_safe_sql(sql, db_type=target_db_type):
                         logger.error(f"[SQL RETRY FIX] Retried SQL is unsafe, stopping")

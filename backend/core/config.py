@@ -85,6 +85,10 @@ ALLOWED_TABLES, ALLOWED_TABLES_BY_CATALOG = _parse_allowed_tables()
 # Runtime'da db_connections'dan kesfedilen tablolar (init_direct_adapters tarafindan doldurulur)
 DYNAMIC_ALLOWED_TABLES: set[str] = set()
 
+# Trino: bare tablo adi -> tam nitelikli isim haritasi (build_dynamic_schema tarafindan doldurulur)
+# Ornek: {"customers": "musteri_pg.public.customers", "credit_scores": "finans_mysql.defaultdb.credit_scores"}
+TRINO_TABLE_MAP: dict[str, str] = {}
+
 
 def get_all_allowed_tables_sync() -> set[str]:
     """ALLOWED_TABLES + DYNAMIC_ALLOWED_TABLES (sync, guvenlik kontrolu icin)."""
@@ -196,6 +200,18 @@ async def build_dynamic_schema() -> str:
             lines.append(f"CREATE TABLE {tbl_name} (\n" + ",\n".join(cols) + "\n);")
 
         DYNAMIC_SCHEMA = "\n\n".join(lines)
+
+        # Trino table map: bare_name -> full_name (SQL post-processing icin)
+        global TRINO_TABLE_MAP
+        TRINO_TABLE_MAP = {}
+        for table in tables:
+            fn = table.get("full_name")
+            bn = table.get("name")
+            if fn and bn and fn.count(".") == 2:
+                TRINO_TABLE_MAP[bn] = fn
+        if TRINO_TABLE_MAP:
+            logger.info(f"[SCHEMA] Trino table map: {list(TRINO_TABLE_MAP.keys())}")
+
         profiled = sum(len(v) for v in profiles.values())
         logger.info(f"[SCHEMA] Dynamic schema built ({len(tables)} tables, {profiled} profiled columns)")
         return DYNAMIC_SCHEMA
