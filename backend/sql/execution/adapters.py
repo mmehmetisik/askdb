@@ -607,6 +607,11 @@ class TrinoAdapter(DatabaseAdapter):
 
     def _get_conn(self, catalog=None, schema=None):
         params = dict(self._conn_params)
+        # Varsayilan catalog/schema her zaman cikarilir; sadece
+        # acikca verilen degerler eklenir (session context icin).
+        # Boylece gecersiz varsayilan ("hive") Trino'ya gonderilmez.
+        params.pop("catalog", None)
+        params.pop("schema", None)
         if catalog:
             params["catalog"] = catalog
         if schema:

@@ -64,6 +64,13 @@ ml_models/
 /test_query.py
 
 # ========================
+# Internal docs (push edilmeyecek)
+# ========================
+docs/agile-terimler-sozlugu.md
+docs/jira-import.csv
+docs/sprint-1-takvim.md
+
+# ========================
 # Misc
 # ========================
 *.log
