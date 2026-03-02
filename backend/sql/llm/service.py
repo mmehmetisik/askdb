@@ -110,8 +110,13 @@ def _get_dialect_notes(db_type: str | None = None) -> str:
 
 
 async def generate_sql(question: str, selected_tables: list[str] | None = None,
-                       db_type: str | None = None) -> str:
-    schema = get_active_schema()
+                       db_type: str | None = None, use_trino: bool = False) -> str:
+    # Trino modunda full_name'li schema kullan
+    if use_trino:
+        from backend.core.config import TRINO_DYNAMIC_SCHEMA
+        schema = TRINO_DYNAMIC_SCHEMA or get_active_schema()
+    else:
+        schema = get_active_schema()
     dialect = _get_dialect_name(db_type)
     dialect_notes = _get_dialect_notes(db_type)
 

@@ -82,10 +82,11 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
                      (f" | tables={tables_filter}" if tables_filter else "") +
                      f" | db_type={target_db_type}")
         await emit_progress(session_id, "llm_generating", progress=30)
+        _use_trino = is_trino_active() and _user_has_trino(user)
         sql = await generate_sql(question, selected_tables=tables_filter or None,
-                                 db_type=target_db_type)
-        # Trino: LLM bare tablo adlari uretirse otomatik duzelt
-        if is_trino_active() and _user_has_trino(user):
+                                 db_type=target_db_type, use_trino=_use_trino)
+        # Trino: LLM bare tablo adlari uretirse yedek olarak otomatik duzelt
+        if _use_trino:
             sql = qualify_trino_tables(sql)
         logger.info(f"[SQL GENERATED] {sql}")
 
@@ -117,7 +118,7 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
 
         # Execute via Trino or direct (with retry on failure)
         await emit_progress(session_id, "executing", progress=80)
-        use_trino = is_trino_active() and _user_has_trino(user)
+        use_trino = _use_trino  # Yukarida hesaplandi
 
         exec_attempts = 0
         max_exec_retries = 2

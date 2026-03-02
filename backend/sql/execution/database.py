@@ -614,6 +614,49 @@ async def run_sql_trino(sql: str, limit: int | None = None) -> dict:
     return result
 
 
+def _build_trino_schema_cache(tables: list):
+    """Trino schema text ve table map cache'le (LLM prompt icin).
+
+    get_trino_schema_info() sonucu bu fonksiyona verilir.
+    full_name'li CREATE TABLE satirlari olusturulur.
+    """
+    import backend.core.config as cfg
+
+    if not tables:
+        cfg.TRINO_DYNAMIC_SCHEMA = ""
+        cfg.TRINO_TABLE_MAP = {}
+        return
+
+    lines = []
+    _temp_map: dict[str, str] = {}
+    _duplicates: set[str] = set()
+
+    for table in tables:
+        tbl_name = table.get("full_name") or table["name"]
+        bare_name = table.get("name")
+        cols = []
+        for col in table.get("columns", []):
+            pk = " PRIMARY KEY" if col.get("is_pk") else ""
+            nullable = "" if col.get("nullable") else " NOT NULL"
+            cols.append(f"  {col['name']} {col['type'].upper()}{pk}{nullable}")
+        lines.append(f"CREATE TABLE {tbl_name} (\n" + ",\n".join(cols) + "\n);")
+
+        # Table map: bare_name -> full_name
+        fn = table.get("full_name")
+        if fn and bare_name and fn.count(".") == 2:
+            if bare_name in _temp_map and _temp_map[bare_name] != fn:
+                _duplicates.add(bare_name)
+            _temp_map[bare_name] = fn
+
+    cfg.TRINO_DYNAMIC_SCHEMA = "\n\n".join(lines)
+    cfg.TRINO_TABLE_MAP = {k: v for k, v in _temp_map.items() if k not in _duplicates}
+
+    if _duplicates:
+        logger.warning(f"[TRINO SCHEMA] Table name conflicts (skipped from map): {_duplicates}")
+    logger.info(f"[TRINO SCHEMA] Cached schema ({len(tables)} tables), "
+                f"table map ({len(cfg.TRINO_TABLE_MAP)} entries): {list(cfg.TRINO_TABLE_MAP.keys())}")
+
+
 async def get_trino_schema_info() -> list:
     """Get schema info via Trino (filtered by allowed_tables).
 
@@ -691,6 +734,10 @@ async def get_trino_schema_info() -> list:
     try:
         result = await _trino_adapter.get_schema_info(tables)
         logger.info(f"[TRINO SCHEMA] Result: {len(result)} tables with columns")
+
+        # Trino schema text + table map cache'le (LLM prompt icin)
+        _build_trino_schema_cache(result)
+
         return result
     except Exception as e:
         logger.error(f"[TRINO SCHEMA] get_schema_info failed: {type(e).__name__}: {e}")

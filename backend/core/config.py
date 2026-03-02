@@ -85,8 +85,9 @@ ALLOWED_TABLES, ALLOWED_TABLES_BY_CATALOG = _parse_allowed_tables()
 # Runtime'da db_connections'dan kesfedilen tablolar (init_direct_adapters tarafindan doldurulur)
 DYNAMIC_ALLOWED_TABLES: set[str] = set()
 
-# Trino: bare tablo adi -> tam nitelikli isim haritasi (build_dynamic_schema tarafindan doldurulur)
-# Ornek: {"customers": "musteri_pg.public.customers", "credit_scores": "finans_mysql.defaultdb.credit_scores"}
+# Trino: tam nitelikli isimlerle schema (get_trino_schema_info tarafindan doldurulur)
+TRINO_DYNAMIC_SCHEMA: str = ""
+# Trino: bare tablo adi -> tam nitelikli isim haritasi
 TRINO_TABLE_MAP: dict[str, str] = {}
 
 
