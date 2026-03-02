@@ -5,7 +5,7 @@
 
 **Tarih**: ....
 **Sprint**: 1
-**Onaylayan SM**: Gozde KIZILKAYA
+**Onaylayan**: Mehmet ISIK (PO)
 
 ---
 

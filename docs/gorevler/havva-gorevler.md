@@ -32,7 +32,7 @@
 
 > **ONEMLI**: Senin sorgularin diger takim uyelerinden **tamamen farkli** olmali.
 > Ayni veya benzer sorgular kabul edilmez. Farkli tablolar, farkli senaryolar sec.
-> **TESTE BASLAMADAN ONCE** sorgu listeni Scrum Master'a (Gozde) onaylat. Onay almadan teste baslanmaz.
+> **TESTE BASLAMADAN ONCE** sorgu listeni Product Owner'a (Mehmet) onaylat. Onay almadan teste baslanmaz.
 
 ### 2.1 Tek Veritabani Sorgulari (50 adet)
 - AskDB uzerinden 50 farkli dogal dil sorusu sor
@@ -51,7 +51,7 @@
 
 ### 2.3 Cross-DB Destek Rolu
 - **Diger takim uyeleri cross-DB testlerini seninle birlikte yapacak**
-- Gozde, Onur ve Gamze'nin cross-DB testlerinde Supabase erisimi sagla
+- Onur ve Gamze'nin cross-DB testlerinde Supabase erisimi sagla
 - Credential paylasimi guvenli sekilde yap
 - Cross-DB baglanti sorunlarini coz
 

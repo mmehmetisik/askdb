@@ -17,7 +17,7 @@ feature/* ← Takim uyelerinin calistigi branch'ler.
 ```
 
 - **master**: Canli ortamdaki kod. Kimse direkt push yapamaz. Sprint sonunda PO develop → master merge yapar ve deploy tetikler.
-- **develop**: Gelistirme branch'i. Tum PR'lar develop'a acilir. SM review + PO onay sonrasi merge edilir.
+- **develop**: Gelistirme branch'i. Tum PR'lar develop'a acilir. PO review + onay sonrasi merge edilir.
 - **feature/xxx**: Her gorev icin acilan branch. develop'dan aciilir, develop'a merge edilir.
 
 ## Git Is Akisi
@@ -26,8 +26,8 @@ feature/* ← Takim uyelerinin calistigi branch'ler.
 2. **Kodunu/dokumanini yaz**, commit et, push et
 3. **GitHub'da PR (Pull Request) ac** → **develop** branch'ine dogru! (master'a degil!)
 4. Testlerin gecmesini bekle (CI otomatik calisir)
-5. **Scrum Master (Gozde)** PR'i review eder, onaylar veya yorum yazar
-6. **Product Owner (Mehmet)** final onay verir ve **merge butonuna basar**
+5. **Product Owner (Mehmet)** PR'i review eder, onaylar veya yorum yazar
+6. **Product Owner (Mehmet)** onay verdikten sonra **merge butonuna basar**
 7. Sprint sonunda PO **develop → master** merge yapar ve deploy tetikler
 
 > **ONEMLI**: PR'larinizi **develop** branch'ine acin. Master'a PR acan kisinin PR'i reddedilir.
@@ -122,9 +122,8 @@ Sablonlarda ufak tefek degisiklikler yapabilirsiniz, ancak temel yapi ve tablo f
 > **HICBIR TAKIM UYESI DEPLOY YAPMAZ, YAPAMAZ.**
 
 - Deploy, GitHub Actions uzerinden **manuel** tetiklenir (workflow_dispatch)
-- Scrum Master (Gozde) PR'lari review edip onaylamadan deploy olmaz
-- PO (Mehmet) final onay verdikten sonra deploy tetikler
-- Akis: **PR onay (SM) → Final onay (PO) → Merge → Deploy (PO tetikler)**
+- PO (Mehmet) PR'lari review edip onayladiktan sonra deploy tetikler
+- Akis: **PR onay (PO) → Merge → Deploy (PO tetikler)**
 - Sorun/acil durum varsa once Scrum Master'a bildir, SM PO'ya eskale eder
 
 ## Iletisim

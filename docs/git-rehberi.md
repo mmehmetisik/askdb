@@ -97,11 +97,11 @@ git push
    - **Title**: Kisa aciklama (ornek: "Add ML engine documentation")
    - **Description**: Ne yaptin, neden yaptin
 5. Sag taraftan:
-   - **Reviewers**: `gkizilkaya` (Scrum Master) ekle
+   - **Reviewers**: `mmehmetisik` (Product Owner) ekle
    - **Assignees**: Kendini ekle
 6. **"Create pull request"** tikla
 7. Testlerin gecmesini bekle (yesil tik)
-8. Scrum Master review edecek → PO onaylayacak → merge edilecek (develop'a)
+8. PO review edecek → PO onaylayacak → merge edilecek (develop'a)
 
 ## 5. PR Onaylandiktan Sonra
 
