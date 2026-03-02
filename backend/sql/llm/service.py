@@ -18,7 +18,7 @@ def qualify_trino_tables(sql: str) -> str:
     def _replacer(match):
         keyword = match.group(1)     # FROM / JOIN + bosluk
         table_name = match.group(2)  # bare tablo adi
-        rest = match.group(3)        # sonraki bosluk/karakter
+        rest = match.group(3)        # sonraki karakter: bosluk, ), ;, , veya satir sonu
         qualified = TRINO_TABLE_MAP.get(table_name.lower())
         if qualified:
             return f"{keyword}{qualified}{rest}"
@@ -26,8 +26,9 @@ def qualify_trino_tables(sql: str) -> str:
 
     # FROM|JOIN sonrasi gelen bare tablo adlarini yakala
     # Zaten nitelikli olanlar (nokta iceren) eslesmez cunku \w noktayi icermez
+    # Tablo adindan sonra: whitespace, ), ;, , veya satir sonu gelebilir
     result = re.sub(
-        r'((?:FROM|JOIN)\s+)(\w+)(\s)',
+        r'((?:FROM|JOIN)\s+)(\w+)([\s);,]|$)',
         _replacer,
         sql,
         flags=re.IGNORECASE,
