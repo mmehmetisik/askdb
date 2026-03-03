@@ -31,7 +31,7 @@ var I18n = (function () {
         var src = scripts[0].getAttribute("src");
         basePath = src.substring(0, src.lastIndexOf("/js/"));
       }
-      var resp = await fetch(basePath + "/locales/" + lang + ".json?v=1.0.0");
+      var resp = await fetch(basePath + "/locales/" + lang + ".json?v=1.0.2");
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       _strings = await resp.json();
     } catch (e) {
