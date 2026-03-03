@@ -150,6 +150,10 @@ class AnalysisSession:
         outlier_free = 1 - (total_outliers / max(1, total_numeric_vals)) if total_numeric_vals > 0 else 1.0
 
         quality_score = round((completeness * 0.4 + dup_free * 0.3 + uniqueness * 0.15 + outlier_free * 0.15) * 100, 1)
+        # Sorun varken 100 gostermemeli
+        has_issues = total_nulls > 0 or dup_count > 0 or total_outliers > 0
+        if has_issues and quality_score >= 100:
+            quality_score = 99.9
 
         return {
             "row_count": len(df),
