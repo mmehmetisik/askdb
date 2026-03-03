@@ -1250,6 +1250,87 @@ html.light .analysis-layout select {
   cursor: pointer;
 }
 
+/* ── Preview Confirmation Modal ── */
+.preview-description {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.preview-affected {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: var(--accent-primary);
+  background: rgba(79, 143, 247, 0.1);
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+
+.preview-examples {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 14px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.preview-examples-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.preview-example-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-primary);
+}
+
+.preview-example-row:last-child {
+  border-bottom: none;
+}
+
+.preview-example-row .row-num {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  min-width: 50px;
+  font-weight: 500;
+}
+
+.preview-example-row .before-val {
+  color: #ff6b6b;
+  text-decoration: line-through;
+  opacity: 0.8;
+}
+
+.preview-example-row .arrow {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.preview-example-row .after-val {
+  color: #51cf66;
+  font-weight: 500;
+}
+
+.preview-example-msg {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding: 5px 0;
+}
+
 .btn-send-report {
   background: rgba(34, 197, 94, 0.1) !important;
   color: #22c55e !important;

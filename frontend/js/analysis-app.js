@@ -530,10 +530,14 @@ document.addEventListener("keydown", function (e) {
   if (e.key === "Escape") {
     var modal2 = document.getElementById("colOpModal");
     if (modal2 && modal2.style.display === "flex") closeColOpModal();
+    var modal3 = document.getElementById("previewModal");
+    if (modal3 && modal3.style.display === "flex") closePreviewModal();
   }
 });
 
 // ── Onizleme ve Uygulama ──
+var _pendingApply = null;
+
 async function previewAndApply(operation, colName, params) {
   closeColumnMenu();
   if (!currentReport) return;
@@ -553,28 +557,61 @@ async function previewAndApply(operation, colName, params) {
     }
     var preview = await res.json();
 
-    // Onizleme mesaji
-    var msg = preview.description + "\n\n" + t("analysis.affectedRows", {count: preview.affected_rows});
+    // Pending state sakla
+    _pendingApply = { operation: operation, colName: colName, params: params };
+
+    // Modal icerigi olustur
+    document.getElementById("previewDesc").textContent = preview.description || "";
+    document.getElementById("previewAffected").textContent = t("analysis.affectedRows", {count: preview.affected_rows});
+
+    var examplesDiv = document.getElementById("previewExamples");
+    examplesDiv.style.display = "none";
+    examplesDiv.innerHTML = "";
+
     if (preview.examples && preview.examples.length > 0) {
-      msg += "\n\n" + t("analysis.examples");
+      var exHtml = '<div class="preview-examples-title">' + t("analysis.examples") + '</div>';
       preview.examples.forEach(function (ex) {
         if (ex.before !== undefined) {
-          msg += "\n  " + t("analysis.rowN", {n: (ex.row + 1)}) + ex.before + " \u2192 " + ex.after;
+          exHtml += '<div class="preview-example-row">'
+            + '<span class="row-num">' + t("analysis.rowN", {n: (ex.row + 1)}) + '</span>'
+            + '<span class="before-val">' + escapeHtml(String(ex.before)) + '</span>'
+            + '<span class="arrow">\u2192</span>'
+            + '<span class="after-val">' + escapeHtml(String(ex.after)) + '</span>'
+            + '</div>';
         } else if (ex.message) {
-          msg += "\n  " + ex.message;
+          exHtml += '<div class="preview-example-msg">' + escapeHtml(ex.message) + '</div>';
         }
       });
+      examplesDiv.innerHTML = exHtml;
+      examplesDiv.style.display = "block";
     }
-    msg += "\n\n" + t("analysis.applyConfirm");
 
-    if (!confirm(msg)) return;
+    // Modal'i goster
+    document.getElementById("previewModal").style.display = "flex";
 
-    // Uygula
+  } catch (e) {
+    alert(t("analysis.operationError") + e.message);
+  }
+}
+
+function closePreviewModal() {
+  document.getElementById("previewModal").style.display = "none";
+  _pendingApply = null;
+}
+
+async function confirmPreviewApply() {
+  if (!_pendingApply || !currentReport) return;
+  var op = _pendingApply.operation;
+  var col = _pendingApply.colName;
+  var par = _pendingApply.params;
+  closePreviewModal();
+
+  try {
     var applyRes = await fetch(API_BASE + "/api/analysis/" + currentReport.id + "/apply", {
       method: "POST",
       headers: getAuthHeaders(),
       credentials: "include",
-      body: JSON.stringify({ operation: operation, column: colName, params: params }),
+      body: JSON.stringify({ operation: op, column: col, params: par }),
     });
     if (!applyRes.ok) {
       var applyErr = await applyRes.json().catch(function () { return {}; });
