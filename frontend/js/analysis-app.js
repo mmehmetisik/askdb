@@ -289,29 +289,10 @@ async function loadOperationHistory() {
 }
 
 function renderOperationHistory() {
-  var container = document.getElementById("operationHistory");
-  if (!container) return;
-
-  if (aOperationHistory.length === 0) {
-    container.innerHTML = '<div class="op-history-empty"><i class="fas fa-history"></i> ' + t("analysis.noOperations") + '</div>';
-    return;
+  // Temizleme tabindaki islem gecmisini guncelle
+  if (typeof _renderCleaningHistory === "function") {
+    _renderCleaningHistory();
   }
-
-  var html = '';
-  aOperationHistory.forEach(function (op, i) {
-    html += '<div class="op-history-item">';
-    html += '<span class="op-num">' + (i + 1) + '.</span>';
-    html += '<span class="op-desc">' + escapeHtml(op.description) + '</span>';
-    html += '<span class="op-affected">' + t("common.rowCount", {count: op.affected_rows}) + '</span>';
-    html += '</div>';
-  });
-
-  html += '<div class="op-history-actions">';
-  html += '<button class="btn-op-undo" onclick="undoLastOperation()"><i class="fas fa-undo"></i> ' + t("analysis.undo") + '</button>';
-  html += '<button class="btn-op-reset" onclick="resetAllOperations()"><i class="fas fa-trash-restore"></i> ' + t("analysis.resetAll") + '</button>';
-  html += '</div>';
-
-  container.innerHTML = html;
 }
 
 // ── Kolon Basligi Tiklama → Context Menu ──

@@ -114,7 +114,43 @@ function renderEdaCleaning() {
     html += '</div></div>';
   }
 
+  // ── Section 5: Islem Gecmisi ──
+  html += '<div class="eda-section">';
+  html += '<h4><i class="fas fa-history"></i> Islem Gecmisi</h4>';
+  html += '<div id="cleaningOpHistory"></div>';
+  html += '</div>';
+
   panel.innerHTML = html;
+
+  // Islem gecmisini renderla
+  _renderCleaningHistory();
+}
+
+function _renderCleaningHistory() {
+  var container = document.getElementById("cleaningOpHistory");
+  if (!container) return;
+
+  if (!aOperationHistory || aOperationHistory.length === 0) {
+    container.innerHTML = '<div class="cleaning-ok"><i class="fas fa-check-circle"></i> Henuz islem yapilmadi.</div>';
+    return;
+  }
+
+  var html = '<div class="op-history-list">';
+  aOperationHistory.forEach(function (op, i) {
+    html += '<div class="op-history-item">';
+    html += '<span class="op-num">' + (i + 1) + '.</span>';
+    html += '<span class="op-desc">' + escapeHtml(op.description) + '</span>';
+    html += '<span class="op-affected">' + fmtNum(op.affected_rows) + ' satir</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '<div class="op-history-actions">';
+  html += '<button class="btn-clean" onclick="undoLastOperation()"><i class="fas fa-undo"></i> Geri Al</button>';
+  html += '<button class="btn-clean btn-clean-danger" onclick="resetAllOperations()"><i class="fas fa-trash-restore"></i> Tumu Sifirla</button>';
+  html += '</div>';
+
+  container.innerHTML = html;
 }
 
 /**
