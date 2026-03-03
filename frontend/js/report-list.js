@@ -50,9 +50,12 @@ function renderReports() {
         var dateStr = _reportDate(r.created_at);
         var assignee = r.assignee_name ? " → " + r.assignee_name : "";
 
-        html += '<div class="report-item ' + statusClass + '" onclick="loadReport(' + r.id + ')" title="' + escapeHtml(r.title) + assignee + '">';
+        html += '<div class="report-item ' + statusClass + '" onclick="loadReport(' + r.id + ')">';
         html += '  <div class="report-content">';
-        html += '    <span class="report-title">' + escapeHtml(r.title) + '</span>';
+        html += '    <div style="display:flex;align-items:center;">';
+        html += '      <span class="report-title" style="flex:1;min-width:0;" title="' + escapeHtml(r.title) + assignee + '">' + escapeHtml(r.title) + '</span>';
+        html += '      <button class="report-delete-btn" onclick="event.stopPropagation();deleteReport(' + r.id + ',\'' + escapeHtml(r.title).replace(/'/g, "\\'") + '\')">×</button>';
+        html += '    </div>';
         html += '    <span class="report-meta">';
         html += '      <span class="report-date">' + dateStr + '</span>';
         html += '      <span class="report-status-dot ' + statusClass + '"></span>';
@@ -62,9 +65,6 @@ function renderReports() {
         }
         html += '    </span>';
         html += '  </div>';
-        html += '  <button class="report-delete-btn" onclick="event.stopPropagation();deleteReport(' + r.id + ',\'' + escapeHtml(r.title).replace(/'/g, "\\'") + '\')" title="' + t("common.delete") + '">';
-        html += '    <i class="fas fa-trash-alt"></i>';
-        html += '  </button>';
         html += '</div>';
     });
     container.innerHTML = html;
