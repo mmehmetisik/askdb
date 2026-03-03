@@ -15,6 +15,7 @@ from backend.sql.cache.service import cache_key, get_cached, set_cached
 from backend.sql.rate_limit import check_rate_limit
 from backend.core.i18n import t as _t, get_lang
 from backend.sql.websocket.progress import emit_progress
+from backend.sql.error_handler import classify_error, format_error_result
 
 router = APIRouter(tags=["query"])
 
@@ -102,18 +103,33 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
         if not is_safe_sql(sql, db_type=target_db_type):
             logger.error("[FAILED] Could not generate safe SQL in 3 attempts")
             elapsed_ms = int((_time.time() - _start_time) * 1000)
+            lang = get_lang(request)
+            safety_error_info = {
+                "error_category": "safety_block",
+                "error_title": "Guvenlik Engeli" if lang == "tr" else "Security Block",
+                "error_message": "Uretilen SQL guvenlik kontrolunden gecemedi." if lang == "tr" else "Generated SQL failed security validation.",
+                "error_suggestion": "Sorunuzu farkli sekilde ifade etmeyi deneyin." if lang == "tr" else "Try rephrasing your question.",
+                "error_severity": "warning",
+                "error_stage": "Guvenlik Kontrolu" if lang == "tr" else "Security Validation",
+                "error_raw": f"3 deneme sonrasi guvenli SQL uretilemedi: {sql[:200]}",
+                "error_type": "SafetyBlockError",
+                "execution_time_ms": elapsed_ms,
+                "retry_count": attempts,
+                "mode": "cross-db" if _use_trino else "direct",
+            }
             asyncio.create_task(log_query(
                 username=user["username"], question=question, generated_sql=sql,
                 execution_time_ms=elapsed_ms, row_count=0, is_trino=False,
-                is_cached=False, status="error", error_message=_t("query.couldNotGenerate", get_lang(request)),
+                is_cached=False, status="error", error_message=_t("query.couldNotGenerate", lang),
                 tables_used=tables_filter,
             ))
             return {
                 "question": question,
                 "sql": sql,
-                "result": [[_t("query.errorHeader", get_lang(request))], [_t("query.unsafeSqlRetry", get_lang(request))]],
+                "result": format_error_result(safety_error_info, lang=lang),
                 "column_types": [],
                 "truncated": False,
+                "error_info": safety_error_info,
             }
 
         # Execute via Trino or direct (with retry on failure)
@@ -174,18 +190,29 @@ async def text_to_sql(req: QueryRequest, request: Request, response: Response, u
         logger.error(f"[ERROR] {err_name}: {e}")
         elapsed_ms = int((_time.time() - _start_time) * 1000)
         display_sql = sql or "HATA"
+        lang = get_lang(request)
+
+        # Zengin hata siniflandirmasi
+        _use_trino_flag = is_trino_active() and _user_has_trino(user)
+        error_info = classify_error(e, stage="sql_execution", lang=lang)
+        error_info["execution_time_ms"] = elapsed_ms
+        error_info["retry_count"] = exec_attempts if "exec_attempts" in dir() else 0
+        error_info["mode"] = "cross-db" if _use_trino_flag else "direct"
+
         asyncio.create_task(log_query(
             username=user["username"], question=question, generated_sql=display_sql,
-            execution_time_ms=elapsed_ms, row_count=0, is_trino=False,
+            execution_time_ms=elapsed_ms, row_count=0, is_trino=_use_trino_flag,
             is_cached=False, status="error", error_message=err_msg,
             tables_used=tables_filter,
         ))
+
         return {
             "question": question,
             "sql": display_sql,
-            "result": [[_t("query.errorHeader", get_lang(request))], [f"{err_name}: {err_msg}"]],
+            "result": format_error_result(error_info, lang=lang),
             "column_types": [],
             "truncated": False,
+            "error_info": error_info,
         }
 
     response_data = {
@@ -238,9 +265,20 @@ async def execute_raw_sql(req: ExecuteSQLRequest, request: Request, response: Re
     except Exception as e:
         logger.error(f"[SQL EXEC ERROR] {type(e).__name__}: {e}")
         elapsed_ms = int((_time.time() - _start_time) * 1000)
+        lang = get_lang(request)
+        error_info = classify_error(e, stage="sql_execution", lang=lang)
+        error_info["execution_time_ms"] = elapsed_ms
+        error_info["retry_count"] = 0
+        error_info["mode"] = "cross-db" if use_trino else "direct"
         asyncio.create_task(log_query(
             username=user["username"], question="[MANUAL SQL]", generated_sql=sql,
-            execution_time_ms=elapsed_ms, row_count=0, is_trino=False,
+            execution_time_ms=elapsed_ms, row_count=0, is_trino=use_trino,
             is_cached=False, status="error", error_message=str(e)[:500],
         ))
-        raise HTTPException(status_code=400, detail=_t("query.sqlError", get_lang(request), error=f"{type(e).__name__}: {e}"))
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": _t("query.sqlError", lang, error=f"{type(e).__name__}: {e}"),
+                "error_info": error_info,
+            },
+        )

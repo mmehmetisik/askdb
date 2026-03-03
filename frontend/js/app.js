@@ -192,6 +192,43 @@ async function runQuery() {
     var clearBtn = document.getElementById("clearResultsBtn");
     if (clearBtn) clearBtn.style.display = "inline-flex";
 
+    // Zengin hata bilgisi varsa — detayli hata paneli goster
+    if (data.error_info) {
+      var ei = data.error_info;
+      var sevIcons = { error: "❌", warning: "⚠️", info: "ℹ️" };
+      var sevColors = { error: "#ff4d4f", warning: "#faad14", info: "#1890ff" };
+      var icon = sevIcons[ei.error_severity] || "❌";
+      var color = sevColors[ei.error_severity] || "#ff4d4f";
+      var timeStr = ei.execution_time_ms ? (ei.execution_time_ms / 1000).toFixed(2) + "s" : "";
+      var modeLabel = ei.mode === "cross-db" ? "Cross-DB (Trino)" : "Direct";
+      var retryText = ei.retry_count > 0 ? (ei.retry_count + " retry yapildi") : "";
+
+      var errorHtml = '<div class="error-detail-card" style="' +
+        'border-left: 4px solid ' + color + '; background: var(--bg-secondary); ' +
+        'border-radius: 8px; padding: 16px; margin: 8px 0;">' +
+        '<div style="font-size: 1.1em; font-weight: 600; margin-bottom: 8px; color: ' + color + ';">' +
+        icon + " " + escapeHtml(ei.error_title) + '</div>' +
+        '<div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.9em;">' +
+        '<span style="opacity: 0.7;">Asama:</span><span>' + escapeHtml(ei.error_stage) + '</span>' +
+        '<span style="opacity: 0.7;">Mod:</span><span>' + escapeHtml(modeLabel) + '</span>' +
+        (timeStr ? '<span style="opacity: 0.7;">Sure:</span><span>' + timeStr + '</span>' : '') +
+        (retryText ? '<span style="opacity: 0.7;">Deneme:</span><span>' + escapeHtml(retryText) + '</span>' : '') +
+        '<span style="opacity: 0.7;">Detay:</span><span style="word-break: break-all; font-family: monospace; font-size: 0.85em;">' + escapeHtml(ei.error_raw) + '</span>' +
+        '</div>' +
+        '<div style="margin-top: 12px; padding: 8px 12px; background: var(--bg-primary); border-radius: 6px; font-size: 0.9em;">' +
+        '<b>💡 Oneri:</b> ' + escapeHtml(ei.error_suggestion) +
+        '</div></div>';
+
+      resultContainer.innerHTML = errorHtml;
+      // Hata banner'ini da goster
+      errorBox.innerHTML = '<b><i class="fas fa-exclamation-triangle"></i> ' +
+        escapeHtml(ei.error_title) + ':</b> ' + escapeHtml(ei.error_message);
+      errorBox.style.display = "block";
+
+      saveToHistory(query, data.sql, null, [], 0, elapsed);
+      return;  // Normal tablo render'i atla
+    }
+
     // Row count
     var dataRowCount = 0;
     if (data.result && Array.isArray(data.result) && data.result.length > 1) {
