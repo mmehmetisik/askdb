@@ -403,7 +403,7 @@
     "typeDate": "Date",
     "typeBoolean": "Boolean",
     "trainTestSplit": "Train / Test Split",
-    "trainSplitLabel": "Train: %{train} / Test: %{test}",
+    "trainSplitLabel": "Train: {train} / Test: {test}",
     "startTraining": "Start Training",
     "selectTaskToast": "Select an ML task",
     "selectFeature": "Select at least one feature",

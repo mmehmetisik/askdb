@@ -403,7 +403,7 @@
     "typeDate": "Tarih",
     "typeBoolean": "Boolean",
     "trainTestSplit": "Train / Test Bolme",
-    "trainSplitLabel": "Egitim: %{train} / Test: %{test}",
+    "trainSplitLabel": "Egitim: {train} / Test: {test}",
     "startTraining": "Egitimi Baslat",
     "selectTaskToast": "Bir ML gorevi secin",
     "selectFeature": "En az bir feature secin",
