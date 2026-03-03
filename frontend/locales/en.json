@@ -110,7 +110,8 @@
     "sendError": "Error sending report.",
     "myReports": "My Reports",
     "titleRequired": "Report title is required!",
-    "noReports": "No reports yet"
+    "noReports": "No reports yet",
+    "confirmDelete": "Are you sure you want to delete this report?"
   },
   "chat": {
     "empty": "No queries yet",

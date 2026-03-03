@@ -110,7 +110,8 @@
     "sendError": "Rapor gonderilirken hata olustu.",
     "myReports": "Raporlarim",
     "titleRequired": "Rapor basligi gerekli!",
-    "noReports": "Henuz rapor yok"
+    "noReports": "Henuz rapor yok",
+    "confirmDelete": "Bu raporu silmek istediginize emin misiniz?"
   },
   "chat": {
     "empty": "Henuz sorgu yok",

@@ -62,6 +62,9 @@ function renderReports() {
         }
         html += '    </span>';
         html += '  </div>';
+        html += '  <button class="report-delete-btn" onclick="event.stopPropagation();deleteReport(' + r.id + ',\'' + escapeHtml(r.title).replace(/'/g, "\\'") + '\')" title="' + t("common.delete") + '">';
+        html += '    <i class="fas fa-trash-alt"></i>';
+        html += '  </button>';
         html += '</div>';
     });
     container.innerHTML = html;
@@ -161,6 +164,30 @@ function _reportDate(dateStr) {
     if (!dateStr) return "";
     var d = new Date(dateStr);
     return d.toLocaleDateString(I18n.getLocale(), { day: "numeric", month: "short" });
+}
+
+// ── Rapor Sil ──
+async function deleteReport(reportId, title) {
+    if (!confirm(t("report.confirmDelete") + "\n\n" + title)) return;
+
+    try {
+        var res = await fetch(API_BASE + "/api/reports/" + reportId, {
+            method: "DELETE",
+            headers: getAuthHeaders(),
+            credentials: "include"
+        });
+        if (!res.ok) {
+            var errData = null;
+            try { errData = await res.json(); } catch (e) { /* ignore */ }
+            var msg = (errData && errData.detail) ? errData.detail : "HTTP " + res.status;
+            alert(msg);
+            return;
+        }
+        loadReports();
+    } catch (e) {
+        console.error("[RAPOR SIL] Hata:", e.message);
+        alert(t("common.error") + ": " + e.message);
+    }
 }
 
 // ── Rapor gonderildikten sonra listeyi guncelle ──
