@@ -867,15 +867,15 @@ html.light .sql-edit-area {
   text-align: center; font-style: italic;
 }
 .report-item {
-  display: flex; align-items: flex-start; padding: 6px 8px 6px 12px;
+  display: flex; align-items: center; padding: 6px 4px 6px 12px;
   transition: background 0.15s; border-radius: 4px; margin: 0 4px; cursor: pointer;
 }
 .report-item:hover { background: rgba(255,255,255,0.05); }
 .report-delete-btn {
   background: none; border: none; cursor: pointer;
   opacity: 0; transition: opacity 0.2s, color 0.2s;
-  color: var(--text-muted); font-size: 0.6rem; padding: 0 3px;
-  margin-left: auto; flex-shrink: 0;
+  color: var(--text-muted); font-size: 0.75rem; padding: 4px 6px;
+  flex-shrink: 0; line-height: 1;
 }
 .report-item:hover .report-delete-btn { opacity: 0.5; }
 .report-delete-btn:hover { opacity: 1 !important; color: #ff4d4f; }
