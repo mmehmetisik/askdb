@@ -360,4 +360,10 @@ async def get_ml_tasks(user: dict = Depends(get_current_user)):
            LEFT JOIN app_users u ON t.created_by = u.id
            ORDER BY t.created_at DESC"""
     )
-    return {"success": True, "tasks": rows}
+    tasks = []
+    for r in rows:
+        task = dict(r) if hasattr(r, "keys") else {"id": r[0], "title": r[1], "source_report_id": r[2], "created_by": r[3], "row_count": r[4], "col_count": r[5], "status": r[6], "created_at": r[7], "creator_name": r[8]}
+        if task.get("created_at") and hasattr(task["created_at"], "isoformat"):
+            task["created_at"] = task["created_at"].isoformat()
+        tasks.append(task)
+    return {"success": True, "tasks": tasks}
