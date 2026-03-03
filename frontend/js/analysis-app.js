@@ -688,19 +688,32 @@ function switchEdaTab(tab) {
   if (panel) panel.classList.add("active");
 
   // Grafik/Korelasyon tabinda tabloyu otomatik kapat, diger tablarda ac
+  if (tab === "chart" || tab === "correlation") {
+    _collapseTable(true);
+  } else {
+    _collapseTable(false);
+  }
+}
+
+function _collapseTable(collapse) {
   var tableSection = document.getElementById("analysisTableSection");
-  if (tableSection) {
-    if (tab === "chart" || tab === "correlation") {
-      tableSection.classList.add("collapsed");
-    } else {
-      tableSection.classList.remove("collapsed");
-    }
+  var splitter = document.querySelector(".resize-splitter");
+  var edaContent = document.querySelector(".eda-content");
+  if (collapse) {
+    if (tableSection) tableSection.style.display = "none";
+    if (splitter) splitter.style.display = "none";
+    if (edaContent) { edaContent.style.flex = "1"; edaContent.style.maxHeight = "none"; edaContent.style.minHeight = "0"; }
+  } else {
+    if (tableSection) tableSection.style.display = "";
+    if (splitter) splitter.style.display = "";
+    if (edaContent) { edaContent.style.flex = ""; edaContent.style.maxHeight = ""; edaContent.style.minHeight = ""; }
   }
 }
 
 function toggleDataTable() {
-  var section = document.getElementById("analysisTableSection");
-  if (section) section.classList.toggle("collapsed");
+  var tableSection = document.getElementById("analysisTableSection");
+  var isHidden = tableSection && tableSection.style.display === "none";
+  _collapseTable(!isHidden);
 }
 
 // ── Status ──
@@ -927,8 +940,13 @@ function toggleAnalysisSidebar() {
   // Splitter element olustur
   var splitter = document.createElement("div");
   splitter.className = "resize-splitter";
-  splitter.title = "Surukleyerek boyutlari ayarlayin";
+  splitter.title = "Surukle: boyut ayarla | Cift tikla: tabloyu ac/kapat";
   edaContent.parentNode.insertBefore(splitter, tableSection);
+
+  // Cift tiklama ile toggle
+  splitter.addEventListener("dblclick", function () {
+    toggleDataTable();
+  });
 
   var startY, startH;
 
