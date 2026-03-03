@@ -13,17 +13,26 @@ var pollingInterval = null;     // Polling timer
 
 // =================== INIT ===================
 
-(function initML() {
+var _mlInitDone = false;
+
+I18n.onChange(function () {
   _loadUserInfo();
-  loadMLTasks();
-  loadSavedModels();
+  if (!_mlInitDone) {
+    loadMLTasks();
+    loadSavedModels();
+    _mlInitDone = true;
+  } else if (currentMLTask) {
+    // Dil degisikliginde mevcut paneli yeniden render et
+    renderMLConfig();
+    loadMLTasks();
+  }
 
   // Theme icon fix
   if (document.documentElement.classList.contains("light")) {
     var btn = document.getElementById("themeToggleBtn");
     if (btn) btn.innerHTML = '<i class="fas fa-sun"></i>';
   }
-})();
+});
 
 
 function _loadUserInfo() {
