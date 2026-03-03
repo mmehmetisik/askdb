@@ -130,10 +130,26 @@ class AnalysisSession:
                             "direction": "positive" if val > 0 else "negative",
                         })
 
-        # Data quality score
+        # Data quality score (industry-aligned)
         completeness = 1 - (total_nulls / max(1, df.size))
-        uniqueness = np.mean([c["uniqueness"] for c in columns]) if columns else 1
-        quality_score = round((completeness * 0.4 + uniqueness * 0.3 + (1 - dup_count / max(1, len(df))) * 0.3) * 100, 1)
+        dup_free = 1 - dup_count / max(1, len(df))
+
+        # Akilli uniqueness: sadece anahtar kolonlara uygula
+        # Kolon adi id/email/phone/tel/tc/no iceriyorsa VEYA dogal benzersizlik > %50 ise
+        _key_hints = {"id", "email", "mail", "phone", "tel", "tc", "no", "key", "code", "kod", "numara", "sicil"}
+        key_cols = []
+        for c in columns:
+            col_lower = c["name"].lower().replace("_", "").replace("-", "").replace(" ", "")
+            is_key = any(hint in col_lower for hint in _key_hints)
+            if is_key or c["uniqueness"] > 0.5:
+                key_cols.append(c)
+        uniqueness = np.mean([c["uniqueness"] for c in key_cols]) if key_cols else 1.0
+
+        # Outlier-free: aykiri deger orani
+        total_numeric_vals = sum(c["total"] for c in columns if c.get("outlier_count") is not None)
+        outlier_free = 1 - (total_outliers / max(1, total_numeric_vals)) if total_numeric_vals > 0 else 1.0
+
+        quality_score = round((completeness * 0.4 + dup_free * 0.3 + uniqueness * 0.15 + outlier_free * 0.15) * 100, 1)
 
         return {
             "row_count": len(df),
