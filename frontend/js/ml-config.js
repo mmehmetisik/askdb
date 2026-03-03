@@ -157,9 +157,9 @@ function renderMLConfig() {
 
   panel.innerHTML = html;
 
-  // Default algo selection
-  mlSelectedAlgos = [];
-  _syncAlgoSelection();
+  // Default algo selection — tum algoritmalar secili baslat
+  var algos = mlProblemType === "classification" ? ML_CLASSIFICATION_ALGOS : ML_REGRESSION_ALGOS;
+  mlSelectedAlgos = algos.map(function (a) { return a.key; });
 }
 
 
@@ -238,20 +238,7 @@ function onTargetChange() {
 
 function setProblemType(type) {
   mlProblemType = type;
-
-  // Radio guncelle
-  document.querySelectorAll(".ml-radio-item").forEach(function (el) {
-    el.classList.remove("selected");
-  });
-  var target = type === "classification" ? document.getElementById("radioClassification") : document.getElementById("radioRegression");
-  if (target) target.classList.add("selected");
-
-  // Algo grid yeniden render
-  var grid = document.getElementById("algoGrid");
-  if (grid) {
-    grid.innerHTML = _renderAlgoGrid(type);
-    _syncAlgoSelection();
-  }
+  renderMLConfig();
 }
 
 function selectAllFeatures(selectAll) {
