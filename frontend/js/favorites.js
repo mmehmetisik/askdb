@@ -1,4 +1,4 @@
-/* ========== Sorgu Favorileri ========== */
+/* ========== Sorgu Favorileri (Toolbar Dropdown) ========== */
 var favorites = [];
 var FAVORITES_KEY = "queryFavorites";
 var MAX_FAVORITES = 50;
@@ -96,6 +96,10 @@ function updateFavoriteBtn() {
 function rerunFavorite(id) {
     var fav = favorites.find(f => f.id === id);
     if (!fav) return;
+
+    // Dropdown'u kapat
+    closeFavoritesDropdown();
+
     var input = document.getElementById("queryInput");
     if (input) {
         input.value = fav.question;
@@ -132,7 +136,7 @@ function renderFavorites() {
         html += '    <span class="favorite-text">' + escapeHtml(fav.question) + '</span>';
         html += '    <span class="favorite-time">' + timeStr + '</span>';
         html += '  </div>';
-        html += '  <button class="favorite-delete" onclick="removeFavorite(' + fav.id + ')" title="' + t("common.delete") + '">';
+        html += '  <button class="favorite-delete" onclick="event.stopPropagation();removeFavorite(' + fav.id + ')" title="' + t("common.delete") + '">';
         html += '    <i class="fas fa-times"></i>';
         html += '  </button>';
         html += '</div>';
@@ -140,27 +144,30 @@ function renderFavorites() {
     container.innerHTML = html;
 }
 
-// ── Toggle (Ac/Kapat) ──
-function toggleFavoritesPanel() {
-    var section = document.querySelector(".favorites-section");
-    if (!section) return;
-    section.classList.toggle("collapsed");
-    // Durumu hatirla
-    localStorage.setItem("favoritesCollapsed", section.classList.contains("collapsed") ? "1" : "0");
+// ── Dropdown Toggle ──
+function toggleFavoritesDropdown() {
+    var dropdown = document.getElementById("favoritesDropdown");
+    if (!dropdown) return;
+    dropdown.classList.toggle("show");
 }
 
-function _restoreFavoritesState() {
-    var collapsed = localStorage.getItem("favoritesCollapsed");
-    if (collapsed === "1") {
-        var section = document.querySelector(".favorites-section");
-        if (section) section.classList.add("collapsed");
-    }
+function closeFavoritesDropdown() {
+    var dropdown = document.getElementById("favoritesDropdown");
+    if (dropdown) dropdown.classList.remove("show");
 }
+
+// Disari tiklaninca kapat
+document.addEventListener("click", function(e) {
+    var wrapper = document.querySelector(".favorites-dropdown-wrapper");
+    var dropdown = document.getElementById("favoritesDropdown");
+    if (dropdown && wrapper && !wrapper.contains(e.target)) {
+        dropdown.classList.remove("show");
+    }
+});
 
 // Sayfa yuklendiginde favorileri yukle
 document.addEventListener("DOMContentLoaded", function() {
     loadFavorites();
-    _restoreFavoritesState();
 });
 
 // i18n yuklendikten sonra yeniden render et (async timing fix)

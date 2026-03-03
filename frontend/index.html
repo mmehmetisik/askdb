@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗄️</text></svg>">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="style.css?v=1.0.2" />
+  <link rel="stylesheet" href="style.css?v=1.0.3" />
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
@@ -39,34 +39,6 @@
         <i class="fas fa-circle-notch fa-spin"></i> <span data-i18n="common.loading">Yukleniyor...</span>
       </div>
       <div id="schemaTree" class="schema-tree"></div>
-    </div>
-
-    <!-- Favoriler Bolumu -->
-    <div class="sidebar-section favorites-section">
-      <div class="sidebar-section-header favorites-toggle" onclick="toggleFavoritesPanel()">
-        <div class="sidebar-section-title">
-          <i class="fas fa-star" style="color:var(--accent-warning);"></i> <span data-i18n="sidebar.favorites">Favoriler</span>
-          <span class="history-badge" id="favoritesBadge" style="display:none;">0</span>
-        </div>
-        <button class="btn-fav-toggle" id="favToggleBtn" data-i18n-title="schema.openClose" title="Ac/Kapat">
-          <i class="fas fa-chevron-up"></i>
-        </button>
-      </div>
-      <div id="favoritesList" class="favorites-list"></div>
-    </div>
-
-    <!-- Raporlar Bolumu -->
-    <div class="sidebar-section reports-section">
-      <div class="sidebar-section-header reports-toggle" onclick="toggleReportsPanel()">
-        <div class="sidebar-section-title">
-          <i class="fas fa-clipboard-list" style="color:var(--accent-primary);"></i> <span data-i18n="sidebar.reports">Raporlar</span>
-          <span class="history-badge" id="reportsBadge" style="display:none;">0</span>
-        </div>
-        <button class="btn-fav-toggle" id="reportToggleBtn" data-i18n-title="schema.openClose" title="Ac/Kapat">
-          <i class="fas fa-chevron-up"></i>
-        </button>
-      </div>
-      <div id="reportsList" class="reports-list"></div>
     </div>
 
     <div class="sidebar-footer">
@@ -100,6 +72,32 @@
       <div class="query-timer" id="queryTimer" style="display:none;">
         <i class="fas fa-stopwatch"></i>
         <span id="queryTimerValue">0.00s</span>
+      </div>
+      <div class="favorites-dropdown-wrapper">
+        <button class="panel-toggle" id="favoritesToolbarBtn" onclick="toggleFavoritesDropdown()">
+          <i class="fas fa-star"></i> <span data-i18n="sidebar.favorites">Favoriler</span>
+          <span class="history-badge" id="favoritesBadge" style="display:none;">0</span>
+        </button>
+        <div class="favorites-dropdown" id="favoritesDropdown">
+          <div class="favorites-dropdown-header">
+            <i class="fas fa-star" style="color:var(--accent-warning);"></i>
+            <span data-i18n="sidebar.favorites">Favoriler</span>
+          </div>
+          <div id="favoritesList" class="favorites-dropdown-list"></div>
+        </div>
+      </div>
+      <div class="reports-dropdown-wrapper">
+        <button class="panel-toggle" id="reportsToolbarBtn" onclick="toggleReportsDropdown()">
+          <i class="fas fa-clipboard-list"></i> <span data-i18n="sidebar.reports">Raporlar</span>
+          <span class="history-badge" id="reportsBadge" style="display:none;">0</span>
+        </button>
+        <div class="reports-dropdown" id="reportsDropdown">
+          <div class="reports-dropdown-header">
+            <i class="fas fa-clipboard-list" style="color:var(--accent-primary);"></i>
+            <span data-i18n="sidebar.reports">Raporlar</span>
+          </div>
+          <div id="reportsList" class="reports-dropdown-list"></div>
+        </div>
       </div>
       <button class="panel-toggle" id="clearResultsBtn" onclick="clearResults()" data-i18n-title="results.clearResults" title="Sonuclari temizle" style="display:none;">
         <i class="fas fa-eraser"></i> <span data-i18n="results.clear">Temizle</span>
@@ -296,18 +294,41 @@
   </div>
 </div>
 
+<!-- Delete Report Modal -->
+<div class="modal-overlay" id="deleteReportModal" style="display:none;" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3><i class="fas fa-trash-alt" style="color:#ff4d4f;"></i> <span data-i18n="report.deleteTitle">Raporu Sil</span></h3>
+      <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="deleteReportTitle" style="font-size:0.9rem;color:var(--text-main);margin:0 0 12px 0;"></p>
+      <div id="deleteReportWarning" class="modal-info" style="display:none;background:rgba(255,77,79,0.08);">
+        <i class="fas fa-exclamation-triangle" style="color:#ff4d4f;"></i>
+        <span id="deleteReportWarningText"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeDeleteModal()" data-i18n="common.cancel">Iptal</button>
+      <button class="btn-danger" id="deleteReportConfirmBtn" onclick="confirmDeleteReport()">
+        <i class="fas fa-trash-alt"></i> <span data-i18n="report.deleteButton">Sil</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <script src="js/i18n.js?v=1.0.2"></script>
 <script src="js/store.js?v=1.0.2"></script>
 <script src="js/helpers.js?v=1.0.2"></script>
 <script src="js/theme.js?v=1.0.2"></script>
 <script src="js/schema-tree.js?v=1.0.2"></script>
-<script src="js/favorites.js?v=1.0.2"></script>
+<script src="js/favorites.js?v=1.0.3"></script>
 <script src="js/chat-history.js?v=1.0.2"></script>
 <script src="js/table.js?v=1.0.2"></script>
 <script src="js/export.js?v=1.0.2"></script>
 <script src="js/sql-edit.js?v=1.0.2"></script>
 <script src="js/report-send.js?v=1.0.2"></script>
-<script src="js/report-list.js?v=1.0.2"></script>
+<script src="js/report-list.js?v=1.0.3"></script>
 <script src="js/ws-progress.js?v=1.0.2"></script>
 <script src="js/app.js?v=1.0.2"></script>
 </body>

@@ -111,7 +111,11 @@
     "myReports": "Raporlarim",
     "titleRequired": "Rapor basligi gerekli!",
     "noReports": "Henuz rapor yok",
-    "confirmDelete": "Bu raporu silmek istediginize emin misiniz?"
+    "confirmDelete": "Bu raporu silmek istediginize emin misiniz?",
+    "deleteTitle": "Raporu Sil",
+    "deleteButton": "Sil",
+    "deleting": "Siliniyor...",
+    "deleteWarning": "Bu rapor {tasks} ML gorevine ve {models} modele bagli. Silmek tum iliskili verileri kaldiracak."
   },
   "chat": {
     "empty": "Henuz sorgu yok",

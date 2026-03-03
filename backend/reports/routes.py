@@ -1,12 +1,14 @@
 import json
+import os
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 
 from backend.core.i18n import t as _t, get_lang
 from backend.core.config import logger
 from backend.core.models import ReportCreate, ReportUpdate, MLTaskCreate
 from backend.auth import get_current_user
 from backend.sql.execution.database import get_auth_adapter
+from backend.ml.engine import delete_model_file
 
 router = APIRouter(tags=["reports"])
 
@@ -211,9 +213,46 @@ async def update_report(report_id: int, req: ReportUpdate, request: Request, use
     return {"success": True, "message": _t("reports.updated", get_lang(request))}
 
 
+@router.get("/reports/{report_id}/dependencies")
+async def check_report_dependencies(report_id: int, request: Request, user: dict = Depends(get_current_user)):
+    """Rapor silinmeden once iliskili ML verilerini kontrol et."""
+    adapter = await get_auth_adapter()
+
+    existing = await adapter.fetchrow("SELECT id FROM saved_reports WHERE id = $1", report_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail=_t("reports.notFound", get_lang(request)))
+
+    tasks = await adapter.fetch(
+        "SELECT id FROM ml_tasks WHERE source_report_id = $1", report_id
+    )
+    task_ids = [t["id"] if isinstance(t, dict) else t[0] for t in tasks]
+
+    job_count = 0
+    model_count = 0
+    if task_ids:
+        for tid in task_ids:
+            jobs = await adapter.fetch("SELECT id FROM ml_jobs WHERE ml_task_id = $1", tid)
+            job_count += len(jobs)
+            models = await adapter.fetch("SELECT id FROM ml_models WHERE ml_task_id = $1", tid)
+            model_count += len(models)
+
+    return {
+        "success": True,
+        "has_dependencies": len(task_ids) > 0,
+        "task_count": len(task_ids),
+        "job_count": job_count,
+        "model_count": model_count,
+    }
+
+
 @router.delete("/reports/{report_id}")
-async def delete_report(report_id: int, request: Request, user: dict = Depends(get_current_user)):
-    """Rapor sil."""
+async def delete_report(
+    report_id: int,
+    request: Request,
+    force: bool = Query(False),
+    user: dict = Depends(get_current_user),
+):
+    """Rapor sil. force=true ile iliskili ML verileri de silinir."""
     adapter = await get_auth_adapter()
 
     me = await adapter.fetchrow("SELECT id FROM app_users WHERE username = $1", user["username"])
@@ -227,7 +266,44 @@ async def delete_report(report_id: int, request: Request, user: dict = Depends(g
     if user["role"] != "admin" and e.get("created_by") != my_id:
         raise HTTPException(status_code=403, detail=_t("reports.noDeleteAccess", get_lang(request)))
 
+    # Iliskili ML verilerini kontrol et
+    tasks = await adapter.fetch(
+        "SELECT id FROM ml_tasks WHERE source_report_id = $1", report_id
+    )
+    task_ids = [t["id"] if isinstance(t, dict) else t[0] for t in tasks]
+
+    if task_ids and not force:
+        raise HTTPException(
+            status_code=409,
+            detail="Bu raporun iliskili ML verileri var. force=true ile silin.",
+        )
+
+    # CASCADE sil: ml_models -> ml_jobs -> ml_tasks -> saved_reports
+    if task_ids:
+        for tid in task_ids:
+            # Model dosyalarini temizle
+            models = await adapter.fetch(
+                "SELECT id, file_path FROM ml_models WHERE ml_task_id = $1", tid
+            )
+            for m in models:
+                fp = m["file_path"] if isinstance(m, dict) else m[1]
+                mid = m["id"] if isinstance(m, dict) else m[0]
+                try:
+                    delete_model_file(fp)
+                except Exception:
+                    pass
+                await adapter.execute_command("DELETE FROM ml_models WHERE id = $1", mid)
+
+            # ML jobs sil
+            await adapter.execute_command("DELETE FROM ml_jobs WHERE ml_task_id = $1", tid)
+
+            # ML task sil
+            await adapter.execute_command("DELETE FROM ml_tasks WHERE id = $1", tid)
+
+        logger.info(f"[REPORT CASCADE] Report #{report_id}: {len(task_ids)} tasks deleted")
+
     await adapter.execute_command("DELETE FROM saved_reports WHERE id = $1", report_id)
+    logger.info(f"[REPORT] Report #{report_id} deleted by {user['username']}")
     return {"success": True, "message": _t("reports.deleted", get_lang(request))}
 
 

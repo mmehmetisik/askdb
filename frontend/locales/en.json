@@ -111,7 +111,11 @@
     "myReports": "My Reports",
     "titleRequired": "Report title is required!",
     "noReports": "No reports yet",
-    "confirmDelete": "Are you sure you want to delete this report?"
+    "confirmDelete": "Are you sure you want to delete this report?",
+    "deleteTitle": "Delete Report",
+    "deleteButton": "Delete",
+    "deleting": "Deleting...",
+    "deleteWarning": "This report is linked to {tasks} ML task(s) and {models} model(s). Deleting will remove all related data."
   },
   "chat": {
     "empty": "No queries yet",
