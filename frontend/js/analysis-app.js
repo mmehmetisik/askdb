@@ -686,6 +686,21 @@ function switchEdaTab(tab) {
   });
   var panel = document.getElementById("eda" + tab.charAt(0).toUpperCase() + tab.slice(1));
   if (panel) panel.classList.add("active");
+
+  // Grafik/Korelasyon tabinda tabloyu otomatik kapat, diger tablarda ac
+  var tableSection = document.getElementById("analysisTableSection");
+  if (tableSection) {
+    if (tab === "chart" || tab === "correlation") {
+      tableSection.classList.add("collapsed");
+    } else {
+      tableSection.classList.remove("collapsed");
+    }
+  }
+}
+
+function toggleDataTable() {
+  var section = document.getElementById("analysisTableSection");
+  if (section) section.classList.toggle("collapsed");
 }
 
 // ── Status ──

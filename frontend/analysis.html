@@ -8,8 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="style.css?v=1.0.6" />
-  <link rel="stylesheet" href="analysis.css?v=1.0.6" />
+  <link rel="stylesheet" href="style.css?v=1.0.7" />
+  <link rel="stylesheet" href="analysis.css?v=1.0.7" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -137,9 +137,12 @@
         <div class="eda-panel" id="edaChart"></div>
       </div>
 
-      <!-- Data Table -->
-      <div class="analysis-table-section">
+      <!-- Data Table (collapsible) -->
+      <div class="analysis-table-section" id="analysisTableSection">
         <div class="analysis-table-toolbar">
+          <button class="table-toggle-btn" onclick="toggleDataTable()" title="Tabloyu ac/kapat">
+            <i class="fas fa-chevron-down" id="tableToggleIcon"></i>
+          </button>
           <div class="table-search">
             <i class="fas fa-search"></i>
             <input type="text" id="aTableSearch" data-i18n-placeholder="analysis.searchTable" placeholder="Tabloda ara..." oninput="filterAnalysisTable()">
@@ -148,10 +151,12 @@
             <span class="row-indicator" id="aRowCount"></span>
           </div>
         </div>
-        <div class="analysis-table-wrapper">
-          <div id="analysisTableContainer"></div>
+        <div class="analysis-table-body" id="analysisTableBody">
+          <div class="analysis-table-wrapper">
+            <div id="analysisTableContainer"></div>
+          </div>
+          <div id="paginationContainer"></div>
         </div>
-        <div id="paginationContainer"></div>
       </div>
 
     </div>
@@ -212,15 +217,15 @@
   </div>
 </div>
 
-<script src="js/i18n.js?v=1.0.6"></script>
-<script src="js/store.js?v=1.0.6"></script>
-<script src="js/helpers.js?v=1.0.6"></script>
-<script src="js/analysis-app.js?v=1.0.6"></script>
-<script src="js/eda-engine.js?v=1.0.6"></script>
-<script src="js/eda-render.js?v=1.0.6"></script>
-<script src="js/data-cleaning.js?v=1.0.6"></script>
-<script src="js/column-filter.js?v=1.0.6"></script>
-<script src="js/chart-panel.js?v=1.0.6"></script>
-<script src="js/ml-sender.js?v=1.0.6"></script>
+<script src="js/i18n.js?v=1.0.7"></script>
+<script src="js/store.js?v=1.0.7"></script>
+<script src="js/helpers.js?v=1.0.7"></script>
+<script src="js/analysis-app.js?v=1.0.7"></script>
+<script src="js/eda-engine.js?v=1.0.7"></script>
+<script src="js/eda-render.js?v=1.0.7"></script>
+<script src="js/data-cleaning.js?v=1.0.7"></script>
+<script src="js/column-filter.js?v=1.0.7"></script>
+<script src="js/chart-panel.js?v=1.0.7"></script>
+<script src="js/ml-sender.js?v=1.0.7"></script>
 </body>
 </html>

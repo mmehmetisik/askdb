@@ -14,74 +14,64 @@ function renderEdaChart() {
   var headers = aHeaders || [];
   var html = '';
 
-  html += '<div class="eda-section">';
-  html += '<h4><i class="fas fa-chart-pie"></i> Grafik Olustur</h4>';
+  html += '<div class="eda-section chart-section">';
 
-  html += '<div class="chart-builder">';
+  // Kompakt form — tek satir
+  html += '<div class="chart-compact-form">';
 
-  // Chart type
-  html += '<div class="chart-builder-row">';
-  html += '<div class="filter-field">';
-  html += '<label>Grafik Turu</label>';
+  html += '<div class="chart-field">';
+  html += '<label>Tur</label>';
   html += '<select id="chartTypeSelect">';
-  html += '<option value="bar">Cubuk (Bar)</option>';
-  html += '<option value="line">Cizgi (Line)</option>';
-  html += '<option value="pie">Pasta (Pie)</option>';
-  html += '<option value="doughnut">Halka (Doughnut)</option>';
-  html += '<option value="scatter">Sacilim (Scatter)</option>';
+  html += '<option value="bar">Cubuk</option>';
+  html += '<option value="line">Cizgi</option>';
+  html += '<option value="pie">Pasta</option>';
+  html += '<option value="doughnut">Halka</option>';
+  html += '<option value="scatter">Sacilim</option>';
   html += '</select></div>';
 
-  // X axis
-  html += '<div class="filter-field">';
-  html += '<label>X Ekseni</label>';
+  html += '<div class="chart-field">';
+  html += '<label>X</label>';
   html += '<select id="chartXSelect">';
   headers.forEach(function (h, ci) {
     html += '<option value="' + ci + '">' + escapeHtml(String(h)) + '</option>';
   });
   html += '</select></div>';
 
-  // Y axis
-  html += '<div class="filter-field">';
-  html += '<label>Y Ekseni</label>';
+  html += '<div class="chart-field">';
+  html += '<label>Y</label>';
   html += '<select id="chartYSelect">';
   headers.forEach(function (h, ci) {
     html += '<option value="' + ci + '"' + (ci === 1 ? ' selected' : '') + '>' + escapeHtml(String(h)) + '</option>';
   });
   html += '</select></div>';
 
-  html += '</div>'; // chart-builder-row
-
-  // Aggregation
-  html += '<div class="chart-builder-row">';
-  html += '<div class="filter-field">';
-  html += '<label>Y Agregasyon</label>';
+  html += '<div class="chart-field">';
+  html += '<label>Agregasyon</label>';
   html += '<select id="chartAggSelect">';
-  html += '<option value="count" selected>Sayi (Count)</option>';
-  html += '<option value="sum">Toplam (Sum)</option>';
-  html += '<option value="avg">Ortalama (Avg)</option>';
-  html += '<option value="min">Minimum</option>';
-  html += '<option value="max">Maximum</option>';
-  html += '<option value="none">Yok (ilk 100 satir)</option>';
+  html += '<option value="count" selected>Count</option>';
+  html += '<option value="sum">Sum</option>';
+  html += '<option value="avg">Avg</option>';
+  html += '<option value="min">Min</option>';
+  html += '<option value="max">Max</option>';
+  html += '<option value="none">Yok</option>';
   html += '</select></div>';
 
-  html += '<div class="filter-field">';
-  html += '<label>Limit (Top N)</label>';
+  html += '<div class="chart-field">';
+  html += '<label>Top N</label>';
   html += '<input type="number" id="chartLimitInput" value="20" min="5" max="100">';
   html += '</div>';
 
-  html += '<div class="filter-field" style="align-self:flex-end;">';
-  html += '<button class="btn-clean btn-clean-bulk" onclick="generateCustomChart()"><i class="fas fa-chart-bar"></i> Grafik Olustur</button>';
-  html += '</div>';
-  html += '</div>'; // chart-builder-row
+  html += '<button class="chart-generate-btn" onclick="generateCustomChart()"><i class="fas fa-chart-bar"></i> Olustur</button>';
+  html += '<button class="chart-export-btn" id="chartExportBtn" onclick="exportChartPNG()" style="display:none;"><i class="fas fa-image"></i> PNG</button>';
 
-  html += '</div>'; // chart-builder
+  html += '</div>'; // chart-compact-form
 
-  // Chart canvas
-  html += '<div class="custom-chart-area" id="customChartArea" style="display:none;">';
-  html += '<div class="custom-chart-toolbar">';
-  html += '<button class="btn-sm" onclick="exportChartPNG()"><i class="fas fa-image"></i> PNG</button>';
+  // Chart canvas — her zaman gorunur, placeholder ile
+  html += '<div class="custom-chart-area" id="customChartArea">';
+  html += '<div class="custom-chart-container" id="customChartContainer">';
+  html += '<div class="chart-placeholder" id="chartPlaceholder"><i class="fas fa-chart-pie"></i><span>Grafik olusturmak icin secim yapin ve "Olustur" butonuna basin</span></div>';
+  html += '<canvas id="customChartCanvas" style="display:none;"></canvas>';
   html += '</div>';
-  html += '<div class="custom-chart-container"><canvas id="customChartCanvas"></canvas></div>';
   html += '</div>';
 
   html += '</div>';
@@ -176,9 +166,13 @@ async function generateCustomChart() {
     values = entries.map(function (e) { return e.value; });
   }
 
-  // Show chart area
-  var area = document.getElementById("customChartArea");
-  if (area) area.style.display = "block";
+  // Show canvas, hide placeholder, show export btn
+  var placeholder = document.getElementById("chartPlaceholder");
+  if (placeholder) placeholder.style.display = "none";
+  var canvas = document.getElementById("customChartCanvas");
+  if (canvas) canvas.style.display = "block";
+  var exportBtn = document.getElementById("chartExportBtn");
+  if (exportBtn) exportBtn.style.display = "";
 
   // Destroy old chart
   if (customChart) { customChart.destroy(); customChart = null; }
