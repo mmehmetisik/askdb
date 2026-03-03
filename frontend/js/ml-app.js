@@ -68,14 +68,14 @@ async function loadMLTasks() {
     }
 
     var html = "";
-    data.tasks.forEach(function (t) {
-      var tid = t.id || t[0];
-      var title = t.title || t[2] || "Isimsiz";
-      var rowCount = t.row_count || t[10] || 0;
-      var colCount = t.col_count || t[11] || 0;
-      var status = t.status || t[12] || "pending";
-      var createdAt = t.created_at || t[13] || "";
-      var creator = t.creator_name || t[15] || "";
+    data.tasks.forEach(function (task) {
+      var tid = task.id || task[0];
+      var title = task.title || task[2] || "Isimsiz";
+      var rowCount = task.row_count || task[10] || 0;
+      var colCount = task.col_count || task[11] || 0;
+      var status = task.status || task[12] || "pending";
+      var createdAt = task.created_at || task[13] || "";
+      var creator = task.creator_name || task[15] || "";
 
       var isActive = currentMLTask && currentMLTask.id === tid;
       var dateStr = "";
