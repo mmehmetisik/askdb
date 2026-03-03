@@ -76,7 +76,25 @@ async def _load_session(report_id: int, user: dict):
             column_types = json.loads(column_types_raw)
 
         logger.info(f"[ANALYSIS] Loading report #{report_id}: {len(result_data)} rows")
-        return get_or_create_session(report_id, result_data, column_types)
+        session = get_or_create_session(report_id, result_data, column_types)
+
+        # Eger yeni session olusturulduysa ve DB'de kayitli islemler varsa, replay yap
+        if not session.operations:
+            saved_ops = await adapter.fetch(
+                "SELECT operation_type, column_name, params FROM analysis_operations WHERE report_id = $1 ORDER BY id ASC",
+                report_id,
+            )
+            if saved_ops:
+                ops_list = []
+                for r in saved_ops:
+                    if isinstance(r, dict):
+                        ops_list.append(r)
+                    else:
+                        ops_list.append({"operation_type": r[0], "column_name": r[1], "params": r[2]})
+                session.replay_operations(ops_list)
+                logger.info(f"[ANALYSIS] Replayed {len(ops_list)} saved ops for report #{report_id}")
+
+        return session
     except Exception as e:
         logger.error(f"[ANALYSIS] Session creation error for report #{report_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Veri islenemedi: {str(e)}")

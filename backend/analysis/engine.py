@@ -399,6 +399,32 @@ class AnalysisSession:
             "total_rows": len(self.df_working),
         }
 
+    def replay_operations(self, ops: list[dict]):
+        """Kayitli islemleri sirayla tekrar uygula (session restore icin)."""
+        for op in ops:
+            try:
+                operation = op.get("operation_type") or op.get("operation", "")
+                column = op.get("column_name") or op.get("column")
+                params_raw = op.get("params", "{}")
+                if isinstance(params_raw, str):
+                    params = json.loads(params_raw)
+                else:
+                    params = params_raw or {}
+                self._save_snapshot()
+                affected_count, description = self._execute_op(self.df_working, operation, column, params)
+                self.operations.append({
+                    "id": len(self.operations) + 1,
+                    "operation": operation,
+                    "column": column,
+                    "params": params,
+                    "description": description,
+                    "affected_rows": affected_count,
+                })
+            except Exception as e:
+                logger.warning(f"[ANALYSIS] Replay op failed: {op} -> {e}")
+                break
+        logger.info(f"[ANALYSIS] Replayed {len(self.operations)} ops for report={self.report_id}")
+
     def get_history(self) -> list[dict]:
         """Islem gecmisini dondur."""
         return list(self.operations)
