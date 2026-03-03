@@ -11,7 +11,9 @@ function renderEdaChart() {
   var panel = document.getElementById("edaChart");
   if (!panel || !edaResults) return;
 
-  var headers = aHeaders || [];
+  var headers = aHeaders && aHeaders.length > 0
+    ? aHeaders
+    : (edaResults.columns ? edaResults.columns.map(function (c) { return c.name; }) : []);
   var html = '';
 
   html += '<div class="eda-section chart-section">';
