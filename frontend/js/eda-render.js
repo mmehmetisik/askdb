@@ -361,18 +361,10 @@ function renderEdaDuplicates() {
   html += '<div class="eda-dup-stat"><span class="eda-dup-number">' + fmtNum(dups.count) + '</span><span>Duplike Satir</span></div>';
   html += '<div class="eda-dup-stat"><span class="eda-dup-number">%' + pct + '</span><span>Oran</span></div>';
   html += '</div>';
-  html += '<button class="btn-show-rows btn-lg" onclick="showDuplicateRows()"><i class="fas fa-eye"></i> Tabloda Goster (' + dups.count + ' satir)</button>';
+  html += '<button class="btn-clean btn-clean-bulk btn-lg" onclick="openDupModal()"><i class="fas fa-eye"></i> Duplikeleri Incele ve Sil (' + dups.count + ' satir)</button>';
   html += '</div>';
 
   panel.innerHTML = html;
-}
-
-function showDuplicateRows() {
-  if (!edaResults) return;
-  // Sayfalama modunda satir indeksleri yok — bilgi mesaji goster
-  if (typeof _showToast === "function") {
-    _showToast(edaResults.duplicates.count + " duplike satir var. Temizleme icin Temizleme tab'ini kullanin.");
-  }
 }
 
 // ── Helpers ──

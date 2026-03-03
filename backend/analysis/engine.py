@@ -146,6 +146,25 @@ class AnalysisSession:
             "correlations": correlations,
         }
 
+    def get_duplicate_rows(self, limit: int = 100) -> dict:
+        """Duplike satirlari dondur (max limit adet)."""
+        self.touch()
+        df = self.df_working
+        dup_mask = df.duplicated(keep=False)  # Tum duplike satirlari isle (ilk dahil)
+        dup_df = df[dup_mask].head(limit)
+
+        headers = df.columns.tolist()
+        rows = []
+        for idx, row in dup_df.iterrows():
+            rows.append([_safe_value(row[c]) for c in headers])
+
+        return {
+            "headers": headers,
+            "rows": rows,
+            "total_duplicates": int(dup_mask.sum()),
+            "shown": len(rows),
+        }
+
     def get_column_profile(self, col_name: str) -> dict:
         """Tek kolon icin detayli profil."""
         if col_name not in self.df_working.columns:

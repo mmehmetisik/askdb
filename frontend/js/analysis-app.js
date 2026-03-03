@@ -701,5 +701,153 @@ function logoutAnalysis() {
 // ── Duplicate Remove (global) ──
 async function removeDuplicatesFromMenu() {
   if (!currentReport) return;
-  previewAndApply("remove_duplicates", null, {});
+  openDupModal();
 }
+
+// ── Duplike Modal ──
+async function openDupModal() {
+  if (!currentReport) return;
+  var modal = document.getElementById("dupModal");
+  var info = document.getElementById("dupModalInfo");
+  var tableDiv = document.getElementById("dupModalTable");
+  var delBtn = document.getElementById("dupModalDeleteBtn");
+  if (!modal) return;
+
+  info.textContent = "Yukleniyor...";
+  tableDiv.innerHTML = '<div style="padding:20px;text-align:center;"><i class="fas fa-spinner fa-spin"></i></div>';
+  delBtn.disabled = true;
+  modal.style.display = "flex";
+
+  try {
+    var res = await fetch(API_BASE + "/api/analysis/" + currentReport.id + "/duplicates", {
+      headers: getAuthHeaders(), credentials: "include"
+    });
+    var data = await res.json();
+
+    if (!data.rows || data.rows.length === 0) {
+      info.textContent = "Duplike satir bulunamadi.";
+      tableDiv.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);">Temiz veri!</div>';
+      delBtn.style.display = "none";
+      return;
+    }
+
+    info.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#faad14;"></i> <strong>' + data.total_duplicates + '</strong> duplike satir bulundu.' +
+      (data.shown < data.total_duplicates ? ' (Ilk ' + data.shown + ' tanesi gosteriliyor)' : '');
+
+    var html = '<table class="dup-preview-table"><thead><tr>';
+    html += '<th>#</th>';
+    data.headers.forEach(function(h) { html += '<th>' + escapeHtml(h) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    data.rows.forEach(function(row, i) {
+      html += '<tr>';
+      html += '<td>' + (i + 1) + '</td>';
+      row.forEach(function(cell) {
+        html += '<td>' + escapeHtml(String(cell == null ? '' : cell)) + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    tableDiv.innerHTML = html;
+
+    delBtn.disabled = false;
+    delBtn.style.display = "";
+    delBtn.innerHTML = '<i class="fas fa-broom"></i> ' + data.total_duplicates + ' Duplikeyi Sil';
+  } catch (e) {
+    info.textContent = "Hata: " + e.message;
+    tableDiv.innerHTML = '';
+  }
+}
+
+function closeDupModal() {
+  var modal = document.getElementById("dupModal");
+  if (modal) modal.style.display = "none";
+}
+
+async function confirmDupDelete() {
+  var delBtn = document.getElementById("dupModalDeleteBtn");
+  if (delBtn) {
+    delBtn.disabled = true;
+    delBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Siliniyor...';
+  }
+  try {
+    var res = await fetch(API_BASE + "/api/analysis/" + currentReport.id + "/apply", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ operation: "remove_duplicates", column: null, params: {} }),
+    });
+    var result = await res.json();
+    closeDupModal();
+    await Promise.all([loadPageData(), loadEdaFromBackend(), loadOperationHistory()]);
+    _showToast(result.description || "Duplike satirlar silindi!");
+  } catch (e) {
+    alert("Hata: " + e.message);
+    if (delBtn) {
+      delBtn.disabled = false;
+      delBtn.innerHTML = '<i class="fas fa-broom"></i> Duplikeleri Sil';
+    }
+  }
+}
+
+// ── Sidebar Toggle ──
+function toggleAnalysisSidebar() {
+  var sidebar = document.getElementById("analysisSidebar");
+  if (!sidebar) return;
+  sidebar.classList.toggle("collapsed");
+  var btn = document.getElementById("sidebarToggleBtn");
+  if (btn) {
+    var isCollapsed = sidebar.classList.contains("collapsed");
+    btn.title = isCollapsed ? "Paneli genislet" : "Paneli daralt";
+  }
+  localStorage.setItem("analysisSidebarCollapsed", sidebar.classList.contains("collapsed"));
+}
+// Sayfa yuklendiginde onceki durumu geri yukle
+(function restoreSidebarState() {
+  if (localStorage.getItem("analysisSidebarCollapsed") === "true") {
+    var sb = document.getElementById("analysisSidebar");
+    if (sb) sb.classList.add("collapsed");
+  }
+})();
+
+// ── Resizable Splitter (EDA ↔ Table) ──
+(function initResizableSplitter() {
+  var workspace = document.querySelector(".analysis-workspace");
+  if (!workspace) return;
+
+  var edaContent = workspace.querySelector(".eda-content");
+  var tableSection = workspace.querySelector(".analysis-table-section");
+  if (!edaContent || !tableSection) return;
+
+  // Splitter element olustur
+  var splitter = document.createElement("div");
+  splitter.className = "resize-splitter";
+  splitter.title = "Surukleyerek boyutlari ayarlayin";
+  edaContent.parentNode.insertBefore(splitter, tableSection);
+
+  var startY, startH;
+
+  splitter.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    startY = e.clientY;
+    startH = edaContent.getBoundingClientRect().height;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+    splitter.classList.add("active");
+
+    function onMove(ev) {
+      var delta = ev.clientY - startY;
+      var newH = Math.max(80, Math.min(startH + delta, window.innerHeight * 0.7));
+      edaContent.style.maxHeight = newH + "px";
+      edaContent.style.minHeight = newH + "px";
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      splitter.classList.remove("active");
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+})();

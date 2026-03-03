@@ -115,6 +115,16 @@ async def get_eda_summary(
     return session.get_eda_summary()
 
 
+@analysis_router.get("/{report_id}/duplicates")
+async def get_duplicate_rows(
+    report_id: int,
+    user: dict = Depends(get_current_user),
+):
+    """Duplike satirlari dondur (inceleme icin)."""
+    session = await _load_session(report_id, user)
+    return session.get_duplicate_rows()
+
+
 @analysis_router.get("/{report_id}/column/{col_name}")
 async def get_column_profile(
     report_id: int,

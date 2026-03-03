@@ -74,6 +74,67 @@ html.light .analysis-layout select {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.25s ease, min-width 0.25s ease;
+}
+
+/* Sidebar collapsed state */
+.analysis-sidebar.collapsed {
+  width: 52px;
+  min-width: 52px;
+}
+.analysis-sidebar.collapsed .sidebar-text,
+.analysis-sidebar.collapsed .subtitle,
+.analysis-sidebar.collapsed .sidebar-section,
+.analysis-sidebar.collapsed .sidebar-footer .user-info > div:last-child,
+.analysis-sidebar.collapsed .sidebar-actions .btn-theme:not(#sidebarToggleBtn),
+.analysis-sidebar.collapsed .sidebar-actions .btn-logout {
+  display: none;
+}
+.analysis-sidebar.collapsed .sidebar-header h1 {
+  justify-content: center;
+}
+.analysis-sidebar.collapsed .sidebar-header h1 i {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.analysis-sidebar.collapsed .sidebar-header {
+  padding: 14px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.analysis-sidebar.collapsed .sidebar-header > div {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.analysis-sidebar.collapsed .btn-sidebar-toggle i {
+  transform: rotate(180deg);
+}
+.analysis-sidebar.collapsed .sidebar-footer {
+  padding: 8px 4px;
+  align-items: center;
+}
+.analysis-sidebar.collapsed .user-avatar {
+  margin: 0 auto;
+}
+
+/* Toggle button style */
+.btn-sidebar-toggle {
+  background: none;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+  width: auto !important;
+  min-width: auto;
+}
+.btn-sidebar-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
 }
 
 .analysis-main {
@@ -319,11 +380,11 @@ html.light .analysis-layout select {
 
 /* ── EDA Content ── */
 .eda-content {
-  flex: 1;
+  flex: 0 0 auto;
   overflow-y: auto;
   padding: 16px;
-  min-height: 300px;
-  max-height: 50vh;
+  min-height: 150px;
+  max-height: 45vh;
 }
 
 .eda-panel {
@@ -723,13 +784,44 @@ html.light .analysis-layout select {
   font-size: 0.82rem;
 }
 
+/* ── Resizable Splitter ── */
+.resize-splitter {
+  height: 6px;
+  background: var(--border-color);
+  cursor: row-resize;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.15s;
+}
+.resize-splitter:hover,
+.resize-splitter.active {
+  background: var(--accent-primary);
+}
+.resize-splitter::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 3px;
+  border-top: 1px solid var(--text-muted);
+  border-bottom: 1px solid var(--text-muted);
+  opacity: 0.5;
+}
+.resize-splitter:hover::after,
+.resize-splitter.active::after {
+  opacity: 1;
+  border-color: white;
+}
+
 /* ── Data Table ── */
 .analysis-table-section {
-  border-top: 1px solid var(--border-color);
+  border-top: none;
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 200px;
+  flex: 1 1 0;
+  min-height: 250px;
   overflow: hidden;
 }
 
@@ -1693,7 +1785,7 @@ html.light .analysis-layout select {
 .op-history-panel {
   border-top: 1px solid var(--border-color);
   background: var(--bg-secondary);
-  max-height: 180px;
+  max-height: 120px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1832,4 +1924,42 @@ html.light .analysis-layout select {
 .analysis-toast.show {
   transform: translateY(0);
   opacity: 1;
+}
+
+/* ============================================================
+   Duplicate Preview Modal Table
+   ============================================================ */
+.dup-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.dup-preview-table th {
+  background: var(--bg-secondary);
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.dup-preview-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dup-preview-table tr:nth-child(even) {
+  background: rgba(255,255,255,0.02);
+}
+.dup-preview-table tr:hover {
+  background: rgba(79,143,247,0.08);
 }
