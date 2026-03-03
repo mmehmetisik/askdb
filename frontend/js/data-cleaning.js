@@ -88,7 +88,7 @@ function renderEdaCleaning() {
     html += '<div class="cleaning-dup-info">';
     html += '<span class="cleaning-dup-count">' + fmtNum(edaResults.duplicates.count) + '</span> duplike satir bulundu.';
     html += '</div>';
-    html += '<button class="btn-clean btn-clean-bulk" onclick="cleanOp(\'remove_duplicates\',null)"><i class="fas fa-broom"></i> Duplikeleri Sil (Ilk kaydi tut)</button>';
+    html += '<button class="btn-clean btn-clean-bulk" onclick="openDupModal()"><i class="fas fa-eye"></i> Duplikeleri Incele ve Sil</button>';
   }
   html += '</div>';
 

@@ -150,8 +150,13 @@ class AnalysisSession:
         """Duplike satirlari dondur (max limit adet)."""
         self.touch()
         df = self.df_working
-        dup_mask = df.duplicated(keep=False)  # Tum duplike satirlari isle (ilk dahil)
-        dup_df = df[dup_mask].head(limit)
+
+        # Tum duplike satirlari goster (karsilastirma icin keep=False)
+        all_dup_mask = df.duplicated(keep=False)
+        dup_df = df[all_dup_mask].head(limit)
+
+        # Silinecek satir sayisi (ilk kayit tutulur, keep='first')
+        remove_count = int(df.duplicated(keep="first").sum())
 
         headers = df.columns.tolist()
         rows = []
@@ -161,7 +166,8 @@ class AnalysisSession:
         return {
             "headers": headers,
             "rows": rows,
-            "total_duplicates": int(dup_mask.sum()),
+            "total_shown": int(all_dup_mask.sum()),
+            "remove_count": remove_count,
             "shown": len(rows),
         }
 

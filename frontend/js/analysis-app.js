@@ -731,8 +731,11 @@ async function openDupModal() {
       return;
     }
 
-    info.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#faad14;"></i> <strong>' + data.total_duplicates + '</strong> duplike satir bulundu.' +
-      (data.shown < data.total_duplicates ? ' (Ilk ' + data.shown + ' tanesi gosteriliyor)' : '');
+    var removeCount = data.remove_count || 0;
+    info.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#faad14;"></i> ' +
+      '<strong>' + data.total_shown + '</strong> satir duplike grubunda. ' +
+      'Silme islemi <strong>' + removeCount + '</strong> satiri kaldiracak (ilk kayitlar tutulur).' +
+      (data.shown < data.total_shown ? ' <br><span style="font-size:0.75rem;">(Ilk ' + data.shown + ' tanesi gosteriliyor)</span>' : '');
 
     var html = '<table class="dup-preview-table"><thead><tr>';
     html += '<th>#</th>';
@@ -751,7 +754,7 @@ async function openDupModal() {
 
     delBtn.disabled = false;
     delBtn.style.display = "";
-    delBtn.innerHTML = '<i class="fas fa-broom"></i> ' + data.total_duplicates + ' Duplikeyi Sil';
+    delBtn.innerHTML = '<i class="fas fa-broom"></i> ' + removeCount + ' Duplikeyi Sil';
   } catch (e) {
     info.textContent = "Hata: " + e.message;
     tableDiv.innerHTML = '';

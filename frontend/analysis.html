@@ -8,8 +8,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="style.css?v=1.0.2" />
-  <link rel="stylesheet" href="analysis.css?v=1.0.2" />
+  <link rel="stylesheet" href="style.css?v=1.0.3" />
+  <link rel="stylesheet" href="analysis.css?v=1.0.3" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -108,26 +108,14 @@
           <button class="eda-tab active" data-tab="overview" onclick="switchEdaTab('overview')">
             <i class="fas fa-tachometer-alt"></i> <span data-i18n="analysis.tabs.overview">Ozet</span>
           </button>
-          <button class="eda-tab" data-tab="missing" onclick="switchEdaTab('missing')">
-            <i class="fas fa-question-circle"></i> <span data-i18n="analysis.tabs.missing">Eksik Deger</span>
-          </button>
-          <button class="eda-tab" data-tab="outlier" onclick="switchEdaTab('outlier')">
-            <i class="fas fa-exclamation-triangle"></i> <span data-i18n="analysis.tabs.outlier">Aykiri Deger</span>
-          </button>
           <button class="eda-tab" data-tab="distribution" onclick="switchEdaTab('distribution')">
             <i class="fas fa-chart-bar"></i> <span data-i18n="analysis.tabs.distribution">Dagilim</span>
-          </button>
-          <button class="eda-tab" data-tab="correlation" onclick="switchEdaTab('correlation')">
-            <i class="fas fa-project-diagram"></i> <span data-i18n="analysis.tabs.correlation">Korelasyon</span>
-          </button>
-          <button class="eda-tab" data-tab="duplicates" onclick="switchEdaTab('duplicates')">
-            <i class="fas fa-clone"></i> <span data-i18n="analysis.tabs.duplicates">Duplikasyon</span>
           </button>
           <button class="eda-tab" data-tab="cleaning" onclick="switchEdaTab('cleaning')">
             <i class="fas fa-broom"></i> <span data-i18n="analysis.tabs.cleaning">Temizleme</span>
           </button>
-          <button class="eda-tab" data-tab="filter" onclick="switchEdaTab('filter')">
-            <i class="fas fa-filter"></i> <span data-i18n="analysis.tabs.filter">Filtre</span>
+          <button class="eda-tab" data-tab="correlation" onclick="switchEdaTab('correlation')">
+            <i class="fas fa-project-diagram"></i> <span data-i18n="analysis.tabs.correlation">Korelasyon</span>
           </button>
           <button class="eda-tab" data-tab="chart" onclick="switchEdaTab('chart')">
             <i class="fas fa-chart-pie"></i> <span data-i18n="analysis.tabs.chart">Grafik</span>
@@ -143,13 +131,9 @@
       <!-- EDA Content Panels -->
       <div class="eda-content">
         <div class="eda-panel active" id="edaOverview"></div>
-        <div class="eda-panel" id="edaMissing"></div>
-        <div class="eda-panel" id="edaOutlier"></div>
         <div class="eda-panel" id="edaDistribution"></div>
-        <div class="eda-panel" id="edaCorrelation"></div>
-        <div class="eda-panel" id="edaDuplicates"></div>
         <div class="eda-panel" id="edaCleaning"></div>
-        <div class="eda-panel" id="edaFilter"></div>
+        <div class="eda-panel" id="edaCorrelation"></div>
         <div class="eda-panel" id="edaChart"></div>
       </div>
 
@@ -201,15 +185,15 @@
   </div>
 </div>
 
-<script src="js/i18n.js?v=1.0.2"></script>
-<script src="js/store.js?v=1.0.2"></script>
-<script src="js/helpers.js?v=1.0.2"></script>
-<script src="js/analysis-app.js?v=1.0.2"></script>
-<script src="js/eda-engine.js?v=1.0.2"></script>
-<script src="js/eda-render.js?v=1.0.2"></script>
-<script src="js/data-cleaning.js?v=1.0.2"></script>
-<script src="js/column-filter.js?v=1.0.2"></script>
-<script src="js/chart-panel.js?v=1.0.2"></script>
-<script src="js/ml-sender.js?v=1.0.2"></script>
+<script src="js/i18n.js?v=1.0.3"></script>
+<script src="js/store.js?v=1.0.3"></script>
+<script src="js/helpers.js?v=1.0.3"></script>
+<script src="js/analysis-app.js?v=1.0.3"></script>
+<script src="js/eda-engine.js?v=1.0.3"></script>
+<script src="js/eda-render.js?v=1.0.3"></script>
+<script src="js/data-cleaning.js?v=1.0.3"></script>
+<script src="js/column-filter.js?v=1.0.3"></script>
+<script src="js/chart-panel.js?v=1.0.3"></script>
+<script src="js/ml-sender.js?v=1.0.3"></script>
 </body>
 </html>
