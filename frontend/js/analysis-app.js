@@ -395,8 +395,8 @@ function showColumnMenu(colName, x, y) {
 
   // Siralama
   html += '<div class="col-menu-divider"></div>';
-  html += '<div class="col-menu-item" onclick="closeColumnMenu();sortAnalysisTable(\'' + escapeHtml(colName) + '\')"><i class="fas fa-sort-alpha-down"></i> ' + t("analysis.sortAsc") + '</div>';
-  html += '<div class="col-menu-item" onclick="closeColumnMenu();aSortDir=\'desc\';sortAnalysisTable(\'' + escapeHtml(colName) + '\')"><i class="fas fa-sort-alpha-up"></i> ' + t("analysis.sortDesc") + '</div>';
+  html += '<div class="col-menu-item" onclick="closeColumnMenu();aSortCol=\'' + escapeHtml(colName) + '\';aSortDir=\'asc\';aCurrentPage=1;loadPageData()"><i class="fas fa-sort-alpha-down"></i> ' + t("analysis.sortAsc") + '</div>';
+  html += '<div class="col-menu-item" onclick="closeColumnMenu();aSortCol=\'' + escapeHtml(colName) + '\';aSortDir=\'desc\';aCurrentPage=1;loadPageData()"><i class="fas fa-sort-alpha-up"></i> ' + t("analysis.sortDesc") + '</div>';
 
   html += '</div>';
 
@@ -434,34 +434,104 @@ function _closeMenuOnOutsideClick(e) {
   if (menu && !menu.contains(e.target)) closeColumnMenu();
 }
 
-// ── Parametre Isteme (sabit deger, harf donusumu, bul-degistir, yeniden adlandir) ──
+// ── Parametre Isteme — Custom Modal ──
+var _colOpState = { operation: null, colName: null };
+
 function promptAndApply(operation, colName) {
   closeColumnMenu();
-  var params = {};
+  _colOpState = { operation: operation, colName: colName };
+
+  var modal = document.getElementById("colOpModal");
+  var title = document.getElementById("colOpModalTitle");
+  var body = document.getElementById("colOpModalBody");
+  if (!modal) return;
+
+  var html = '';
 
   if (operation === "fill_constant") {
-    var val = prompt(t("analysis.promptFillConstant"));
-    if (val === null) return;
-    params.value = val;
+    title.innerHTML = '<i class="fas fa-pen" style="color:var(--accent-primary);"></i> ' + t("analysis.fillConstant");
+    html += '<label class="col-op-label">' + t("analysis.promptFillConstant") + '</label>';
+    html += '<input type="text" class="col-op-input" id="colOpInput1" placeholder="' + t("analysis.promptFillConstant") + '" />';
   } else if (operation === "change_case") {
-    var choice = prompt(t("analysis.promptCaseChange"));
-    if (!choice) return;
-    params.case = choice === "2" ? "upper" : choice === "3" ? "title" : "lower";
+    title.innerHTML = '<i class="fas fa-font" style="color:var(--accent-primary);"></i> ' + t("analysis.changeCase");
+    html += '<label class="col-op-label">' + escapeHtml(colName) + '</label>';
+    html += '<div class="col-op-radio-group">';
+    html += '<label class="col-op-radio"><input type="radio" name="caseType" value="lower" checked /> kucuk harf</label>';
+    html += '<label class="col-op-radio"><input type="radio" name="caseType" value="upper" /> BUYUK HARF</label>';
+    html += '<label class="col-op-radio"><input type="radio" name="caseType" value="title" /> Baslik Harfi</label>';
+    html += '</div>';
   } else if (operation === "find_replace") {
-    var find = prompt(t("analysis.promptFindValue"));
-    if (!find) return;
-    var replace = prompt(t("analysis.promptReplaceValue"));
-    if (replace === null) return;
-    params.find = find;
-    params.replace = replace;
+    title.innerHTML = '<i class="fas fa-search" style="color:var(--accent-primary);"></i> ' + t("analysis.findReplace");
+    html += '<label class="col-op-label">' + escapeHtml(colName) + '</label>';
+    html += '<label class="col-op-sublabel">' + t("analysis.promptFindValue") + '</label>';
+    html += '<input type="text" class="col-op-input" id="colOpInput1" placeholder="' + t("analysis.promptFindValue") + '" />';
+    html += '<label class="col-op-sublabel" style="margin-top:12px;">' + t("analysis.promptReplaceValue") + '</label>';
+    html += '<input type="text" class="col-op-input" id="colOpInput2" placeholder="' + t("analysis.promptReplaceValue") + '" />';
   } else if (operation === "rename_column") {
-    var newName = prompt(t("analysis.promptNewColumnName"), colName);
-    if (!newName || newName === colName) return;
-    params.new_name = newName;
+    title.innerHTML = '<i class="fas fa-i-cursor" style="color:var(--accent-primary);"></i> ' + t("analysis.renameColumn");
+    html += '<label class="col-op-label">' + t("analysis.promptNewColumnName") + '</label>';
+    html += '<input type="text" class="col-op-input" id="colOpInput1" value="' + escapeHtml(colName) + '" />';
   }
 
-  previewAndApply(operation, colName, params);
+  body.innerHTML = html;
+  modal.style.display = "flex";
+
+  // Focus first input
+  setTimeout(function () {
+    var inp = document.getElementById("colOpInput1");
+    if (inp) { inp.focus(); inp.select(); }
+  }, 100);
 }
+
+function closeColOpModal() {
+  var modal = document.getElementById("colOpModal");
+  if (modal) modal.style.display = "none";
+  _colOpState = { operation: null, colName: null };
+}
+
+function confirmColOp() {
+  var op = _colOpState.operation;
+  var col = _colOpState.colName;
+  var params = {};
+
+  if (op === "fill_constant") {
+    var val = (document.getElementById("colOpInput1") || {}).value;
+    if (val === undefined || val === null) return;
+    params.value = val;
+  } else if (op === "change_case") {
+    var radio = document.querySelector('#colOpModalBody input[name="caseType"]:checked');
+    if (!radio) return;
+    params["case"] = radio.value;
+  } else if (op === "find_replace") {
+    var find = (document.getElementById("colOpInput1") || {}).value;
+    var replace = (document.getElementById("colOpInput2") || {}).value;
+    if (!find) return;
+    params.find = find;
+    params.replace = replace || "";
+  } else if (op === "rename_column") {
+    var newName = (document.getElementById("colOpInput1") || {}).value;
+    if (!newName || newName.trim() === "" || newName === col) return;
+    params.new_name = newName.trim();
+  }
+
+  closeColOpModal();
+  previewAndApply(op, col, params);
+}
+
+// Enter ile onaylama
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") {
+    var modal = document.getElementById("colOpModal");
+    if (modal && modal.style.display === "flex") {
+      e.preventDefault();
+      confirmColOp();
+    }
+  }
+  if (e.key === "Escape") {
+    var modal2 = document.getElementById("colOpModal");
+    if (modal2 && modal2.style.display === "flex") closeColOpModal();
+  }
+});
 
 // ── Onizleme ve Uygulama ──
 async function previewAndApply(operation, colName, params) {

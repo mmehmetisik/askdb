@@ -281,7 +281,12 @@ class AnalysisSession:
 
         # Etkilenen satirlardan 5 ornek sec
         examples = []
-        if column and column in df_before.columns:
+        if operation == "drop_column":
+            examples = [{"message": f"'{column}' kolonu silinecek"}]
+        elif operation == "rename_column":
+            new_name = params.get("new_name", "")
+            examples = [{"message": f"'{column}' → '{new_name}' olarak degistirilecek"}]
+        elif column and column in df_before.columns and column in df_temp.columns:
             diff_mask = df_before[column].astype(str) != df_temp[column].astype(str)
             changed_indices = diff_mask[diff_mask].index[:5].tolist()
             for idx in changed_indices:
