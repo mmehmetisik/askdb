@@ -892,11 +892,11 @@ function exportNotebook() {
   };
 
   // Download file
-  var blob = new Blob([JSON.stringify(notebook, null, 2)], { type: "application/json" });
+  var blob = new Blob([JSON.stringify(notebook, null, 2)], { type: "application/json;charset=utf-8" });
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
   a.href = url;
-  a.download = (task.title || "ml_notebook").replace(/[^a-zA-Z0-9_-]/g, "_") + ".ipynb";
+  a.download = (task.title || "ml_notebook").replace(/[^\w\u00C0-\u024F\u0400-\u04FF-]/g, "_") + ".ipynb";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
