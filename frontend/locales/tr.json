@@ -384,6 +384,8 @@
     "taskCreated": "ML gorevi basariyla olusturuldu.",
     "noTasks": "Henuz ML gorevi yok",
     "noModels": "Model yok",
+    "deleteModelConfirm": "Bu modeli silmek istediginizden emin misiniz?",
+    "modelDeleted": "Model basariyla silindi",
     "taskLoadError": "Gorev yuklenemedi",
     "dataSummary": "Veri Ozeti",
     "rowLabel": "Satir",

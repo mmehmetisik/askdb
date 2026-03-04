@@ -4,40 +4,57 @@
    yeniden kullanir, sadece ML'e ozel eklemeler burada.
    ============================================================ */
 
-/* ---- Sidebar models section ---- */
-.ml-models-sidebar {
-  max-height: 200px;
-  overflow-y: auto;
+/* ---- Models Toolbar Dropdown ---- */
+.ml-models-dropdown-wrapper { position: relative; }
+.ml-models-dropdown {
+  display: none; position: absolute; top: 100%; right: 0;
+  margin-top: 4px; background: var(--bg-sidebar);
+  border: 1px solid var(--border-color); border-radius: 10px;
+  min-width: 300px; max-width: 360px; z-index: 100;
+  backdrop-filter: blur(20px); box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.ml-models-dropdown.show { display: block; }
+.ml-models-dropdown-header {
+  padding: 10px 14px; border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem; font-weight: 600; color: var(--text-main);
+  display: flex; align-items: center; gap: 6px;
+}
+.ml-models-dropdown-list { padding: 4px 0; max-height: 360px; overflow-y: auto; }
+.ml-models-empty {
+  padding: 16px; color: var(--text-muted); font-size: 0.78rem;
+  text-align: center; font-style: italic;
 }
 
-.ml-model-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.82rem;
+.ml-model-dropdown-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px 8px 14px; border-radius: 4px;
+  margin: 2px 6px; font-size: 0.82rem; color: var(--text-muted);
   transition: background 0.15s;
-  color: var(--text-muted);
 }
-.ml-model-item:hover {
-  background: var(--hover-bg);
-  color: var(--text-main);
+.ml-model-dropdown-item:hover {
+  background: var(--hover-bg); color: var(--text-main);
 }
-.ml-model-item .fa-robot {
-  color: var(--accent-primary);
-  font-size: 0.9rem;
+.ml-model-dropdown-item .fa-robot {
+  color: var(--accent-primary); font-size: 0.9rem; flex-shrink: 0;
 }
-.ml-model-item .ml-model-algo {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  opacity: 0.7;
+.ml-model-dropdown-name {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-weight: 500; color: var(--text-main); font-size: 0.82rem;
+}
+.ml-model-dropdown-meta {
+  font-size: 0.72rem; color: var(--text-muted); opacity: 0.7;
 }
 .ml-model-best {
-  color: #f59e0b;
-  font-size: 0.7rem;
-  margin-left: auto;
+  color: #f59e0b; font-size: 0.65rem; margin-left: 4px;
+}
+.ml-model-delete-btn {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; padding: 4px 6px; border-radius: 4px;
+  font-size: 0.75rem; opacity: 0; transition: all 0.15s; flex-shrink: 0;
+}
+.ml-model-dropdown-item:hover .ml-model-delete-btn { opacity: 1; }
+.ml-model-delete-btn:hover {
+  color: #ef4444; background: rgba(239, 68, 68, 0.1);
 }
 
 /* ---- Config Panel ---- */

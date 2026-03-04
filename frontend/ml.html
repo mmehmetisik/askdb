@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="style.css?v=1.0.0" />
   <link rel="stylesheet" href="analysis.css?v=1.0.0" />
-  <link rel="stylesheet" href="ml.css?v=1.0.0" />
+  <link rel="stylesheet" href="ml.css?v=2.0.0" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     if (!localStorage.getItem('isLoggedIn')) window.location.href = 'login.html';
@@ -47,20 +47,6 @@
       </div>
     </div>
 
-    <!-- Saved Models Section -->
-    <div class="sidebar-section ml-models-sidebar">
-      <div class="sidebar-section-header">
-        <div class="sidebar-section-title">
-          <i class="fas fa-save"></i> <span data-i18n="ml.models">Modeller</span>
-          <span class="report-badge" id="modelBadge" style="display:none;">0</span>
-        </div>
-        <button class="btn-refresh-schema" onclick="loadSavedModels()" data-i18n-title="common.refresh" title="Yenile">
-          <i class="fas fa-sync-alt"></i>
-        </button>
-      </div>
-      <div id="modelList" class="report-list"></div>
-    </div>
-
     <!-- Footer -->
     <div class="sidebar-footer">
       <div class="user-info">
@@ -93,7 +79,20 @@
         </div>
         <span class="report-meta" id="mlMeta"></span>
       </div>
-      <div class="analysis-header-right" id="mlActions" style="display:none;">
+      <div class="analysis-header-right" id="mlActions">
+        <div class="ml-models-dropdown-wrapper">
+          <button class="panel-toggle" onclick="toggleModelsDropdown()">
+            <i class="fas fa-save"></i> <span data-i18n="ml.models">Modeller</span>
+            <span class="history-badge" id="modelBadge" style="display:none;">0</span>
+          </button>
+          <div class="ml-models-dropdown" id="modelsDropdown">
+            <div class="ml-models-dropdown-header">
+              <i class="fas fa-save" style="color:var(--accent-primary);"></i>
+              <span data-i18n="ml.models">Modeller</span>
+            </div>
+            <div id="modelList" class="ml-models-dropdown-list"></div>
+          </div>
+        </div>
         <span class="ml-job-status" id="mlJobStatus"></span>
       </div>
     </div>
@@ -139,7 +138,7 @@
 
 <script src="js/i18n.js?v=1.0.0"></script>
 <script src="js/helpers.js?v=1.0.0"></script>
-<script src="js/ml-app.js?v=1.0.0"></script>
+<script src="js/ml-app.js?v=2.0.0"></script>
 <script src="js/ml-config.js?v=2.0.0"></script>
 <script src="js/ml-train.js?v=1.0.0"></script>
 <script src="js/ml-predict.js?v=2.0.0"></script>

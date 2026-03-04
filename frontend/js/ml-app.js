@@ -113,7 +113,32 @@ async function loadMLTasks() {
 }
 
 
-// =================== SIDEBAR: SAVED MODELS ===================
+// =================== TOOLBAR: SAVED MODELS DROPDOWN ===================
+
+function toggleModelsDropdown() {
+  var dd = document.getElementById("modelsDropdown");
+  if (!dd) return;
+  dd.classList.toggle("show");
+  // Disariya tiklaninca kapat
+  if (dd.classList.contains("show")) {
+    setTimeout(function () {
+      document.addEventListener("click", _closeModelsDropdown, { once: true, capture: true });
+    }, 0);
+  }
+}
+
+function _closeModelsDropdown(e) {
+  var dd = document.getElementById("modelsDropdown");
+  var wrapper = dd ? dd.closest(".ml-models-dropdown-wrapper") : null;
+  if (wrapper && wrapper.contains(e.target)) {
+    // Dropdown icine tiklandi, tekrar dinle
+    setTimeout(function () {
+      document.addEventListener("click", _closeModelsDropdown, { once: true, capture: true });
+    }, 0);
+    return;
+  }
+  if (dd) dd.classList.remove("show");
+}
 
 async function loadSavedModels() {
   var listEl = document.getElementById("modelList");
@@ -128,7 +153,7 @@ async function loadSavedModels() {
     savedModels = data.success ? (data.models || []) : [];
 
     if (savedModels.length === 0) {
-      listEl.innerHTML = '<div class="schema-empty" style="font-size:0.78rem;padding:12px;"><i class="fas fa-robot"></i> ' + t("ml.noModels") + '</div>';
+      listEl.innerHTML = '<div class="ml-models-empty"><i class="fas fa-robot"></i> ' + t("ml.noModels") + '</div>';
       if (badgeEl) badgeEl.style.display = "none";
       return;
     }
@@ -140,19 +165,57 @@ async function loadSavedModels() {
 
     var html = "";
     savedModels.forEach(function (m) {
-      html += '<div class="ml-model-item" title="' + escapeHtml(m.model_name + " - " + m.algorithm) + '">';
+      var metricStr = "";
+      if (m.metrics) {
+        var key = m.problem_type === "classification" ? "accuracy" : "r2";
+        if (m.metrics[key] !== undefined) {
+          metricStr = (m.metrics[key] * 100).toFixed(1) + "%";
+        }
+      }
+      html += '<div class="ml-model-dropdown-item">';
       html += '<i class="fas fa-robot"></i>';
       html += '<div style="flex:1;min-width:0;">';
-      html += '<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(m.model_name) + '</div>';
-      html += '<div class="ml-model-algo">' + escapeHtml(m.algorithm) + '</div>';
+      html += '<div class="ml-model-dropdown-name">' + escapeHtml(m.model_name);
+      if (m.is_best) html += ' <i class="fas fa-crown ml-model-best" title="En iyi model"></i>';
       html += '</div>';
-      if (m.is_best) html += '<i class="fas fa-crown ml-model-best" title="En iyi model"></i>';
+      html += '<div class="ml-model-dropdown-meta">' + escapeHtml(m.algorithm);
+      if (metricStr) html += ' &middot; ' + metricStr;
+      html += '</div>';
+      html += '</div>';
+      html += '<button class="ml-model-delete-btn" onclick="deleteModel(' + m.id + ', event)" title="' + t("common.delete") + '">';
+      html += '<i class="fas fa-trash-alt"></i>';
+      html += '</button>';
       html += '</div>';
     });
 
     listEl.innerHTML = html;
   } catch (e) {
-    listEl.innerHTML = '<div class="schema-empty" style="font-size:0.78rem;"><i class="fas fa-exclamation-triangle"></i> ' + t("analysis.loadError") + '</div>';
+    listEl.innerHTML = '<div class="ml-models-empty"><i class="fas fa-exclamation-triangle"></i> ' + t("analysis.loadError") + '</div>';
+  }
+}
+
+async function deleteModel(modelId, event) {
+  if (event) event.stopPropagation();
+  if (!confirm(t("ml.deleteModelConfirm"))) return;
+
+  try {
+    var res = await fetch(API_BASE + "/api/ml/models/" + modelId, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    if (handleAuthError(res)) return;
+    var data = await res.json();
+    if (data.success) {
+      _showMLToast(t("ml.modelDeleted"));
+      loadSavedModels();
+      // Predict panelini de guncelle
+      if (activeMLTab === "predict") renderPredictPanel();
+    } else {
+      _showMLToast(data.detail || t("common.error"), "error");
+    }
+  } catch (e) {
+    _showMLToast(t("common.connectionError") + ": " + e.message, "error");
   }
 }
 

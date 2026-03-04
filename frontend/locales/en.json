@@ -384,6 +384,8 @@
     "taskCreated": "ML task created successfully.",
     "noTasks": "No ML tasks yet",
     "noModels": "No models",
+    "deleteModelConfirm": "Are you sure you want to delete this model?",
+    "modelDeleted": "Model deleted successfully",
     "taskLoadError": "Could not load task",
     "dataSummary": "Data Summary",
     "rowLabel": "Rows",
