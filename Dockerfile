@@ -21,7 +21,7 @@ COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 
 # ML models directory (writable by appuser)
-RUN mkdir -p /app/ml_models && chown appuser:appuser /app/ml_models
+RUN mkdir -p /app/backend/ml_models && chown appuser:appuser /app/backend/ml_models
 
 USER appuser
 
