@@ -187,4 +187,19 @@ async def ensure_all_tables(auth_adapter):
     except Exception as e:
         logger.warning(f"[DB] table_profile_id column: {e}")
 
-    logger.info("[DB] All tables ready (query_logs + table_profiles included)")
+    await auth_adapter.execute_command("""
+        CREATE TABLE IF NOT EXISTS ml_predictions (
+            id SERIAL PRIMARY KEY,
+            ml_model_id INT NOT NULL REFERENCES ml_models(id),
+            model_name VARCHAR(100) NOT NULL,
+            algorithm VARCHAR(100) NOT NULL,
+            target_column VARCHAR(200) DEFAULT '',
+            input_summary TEXT DEFAULT '',
+            predictions TEXT DEFAULT '[]',
+            row_count INT DEFAULT 0,
+            created_by INT NOT NULL REFERENCES app_users(id),
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
+    logger.info("[DB] All tables ready (query_logs + table_profiles + ml_predictions included)")

@@ -78,10 +78,22 @@ function renderPredictPanel() {
   html += '<div class="ml-predict-results" id="predictResultsDiv"></div>';
   html += '</div>';
 
+  // 4. Tahmin Gecmisi
+  html += '<div class="ml-predict-section">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;">';
+  html += '<h4><i class="fas fa-history"></i> ' + t("ml.predictionHistory") + '</h4>';
+  html += '<button class="ml-clear-history-btn" onclick="clearPredictionHistory()"><i class="fas fa-trash-alt"></i> ' + t("ml.clearHistory") + '</button>';
+  html += '</div>';
+  html += '<div id="predictionHistoryDiv" class="ml-history-empty"><i class="fas fa-circle-notch fa-spin"></i></div>';
+  html += '</div>';
+
   panel.innerHTML = html;
 
   // CSV drag-drop setup
   setTimeout(function () { _setupCsvDragDrop(); }, 50);
+
+  // Load prediction history
+  loadPredictionHistory();
 }
 
 
@@ -172,14 +184,16 @@ async function predictSingle() {
       body: JSON.stringify({
         model_id: modelId,
         data: [headers, row],
+        explain: true,
       }),
     });
     if (handleAuthError(res)) return;
     var data = await res.json();
 
     if (data.success) {
-      _showPredictResults([headers, row], data.predictions, data.target_column);
+      _showPredictResults([headers, row], data.predictions, data.target_column, data.explanations);
       _showMLToast(t("ml.predictionSuccess"));
+      loadPredictionHistory();
     } else {
       _showMLToast(t("ml.predictionError") + (data.detail || ""), "error");
     }
@@ -206,14 +220,16 @@ async function predictBatch() {
       body: JSON.stringify({
         model_id: modelId,
         data: mlCsvData,
+        explain: true,
       }),
     });
     if (handleAuthError(res)) return;
     var data = await res.json();
 
     if (data.success) {
-      _showPredictResults(mlCsvData, data.predictions, data.target_column);
+      _showPredictResults(mlCsvData, data.predictions, data.target_column, data.explanations);
       _showMLToast(t("ml.batchPredictSuccess", {count: data.predictions.length}));
+      loadPredictionHistory();
     } else {
       _showMLToast(t("ml.predictionError") + (data.detail || ""), "error");
     }
@@ -324,7 +340,7 @@ function _showCsvPreview(data) {
 
 // =================== RESULTS DISPLAY ===================
 
-function _showPredictResults(inputData, predictions, targetColumn) {
+function _showPredictResults(inputData, predictions, targetColumn, explanations) {
   var section = document.getElementById("predictResultsSection");
   var div = document.getElementById("predictResultsDiv");
   if (!section || !div) return;
@@ -333,6 +349,7 @@ function _showPredictResults(inputData, predictions, targetColumn) {
 
   var headers = inputData[0];
   var rows = inputData.slice(1);
+  var hasExplanations = explanations && explanations.length > 0;
 
   var html = '<table>';
   // Header
@@ -341,6 +358,9 @@ function _showPredictResults(inputData, predictions, targetColumn) {
     html += '<th>' + escapeHtml(String(h)) + '</th>';
   });
   html += '<th class="ml-pred-col"><i class="fas fa-magic"></i> ' + escapeHtml(targetColumn || t("ml.predicted")) + '</th>';
+  if (hasExplanations) {
+    html += '<th class="ml-explain-col"><i class="fas fa-lightbulb"></i> ' + t("ml.explanation") + '</th>';
+  }
   html += '</tr></thead>';
 
   // Body
@@ -352,9 +372,101 @@ function _showPredictResults(inputData, predictions, targetColumn) {
     });
     var pred = predictions[i] !== undefined ? predictions[i] : "-";
     html += '<td class="ml-pred-col"><strong>' + escapeHtml(String(pred)) + '</strong></td>';
+    if (hasExplanations) {
+      html += '<td class="ml-explain-col">' + _formatExplanation(explanations[i]) + '</td>';
+    }
     html += '</tr>';
   });
   html += '</tbody></table>';
 
   div.innerHTML = html;
+}
+
+function _formatExplanation(expl) {
+  if (!expl || !expl.length) return '<span style="color:var(--text-muted);">-</span>';
+  var parts = [];
+  expl.forEach(function (item, idx) {
+    var cls = idx === 0 ? "ml-expl-pos" : "ml-expl-neg";
+    parts.push(
+      '<span class="ml-expl-chip ' + cls + '">' +
+      escapeHtml(item.feature) + ' <small>(' + item.contribution.toFixed(2) + ')</small>' +
+      '</span>'
+    );
+  });
+  return parts.join(" ");
+}
+
+
+// =================== PREDICTION HISTORY ===================
+
+async function loadPredictionHistory() {
+  var div = document.getElementById("predictionHistoryDiv");
+  if (!div) return;
+
+  try {
+    var res = await fetch(API_BASE + "/api/ml/predictions", {
+      headers: getAuthHeaders(),
+      credentials: "include",
+    });
+    if (handleAuthError(res)) return;
+    var data = await res.json();
+
+    if (!data.success || !data.predictions || data.predictions.length === 0) {
+      div.innerHTML = '<div class="ml-history-empty">' + t("ml.noHistory") + '</div>';
+      return;
+    }
+
+    _renderPredictionHistory(div, data.predictions);
+  } catch (e) {
+    div.innerHTML = '<div class="ml-history-empty">' + t("common.connectionError") + '</div>';
+  }
+}
+
+function _renderPredictionHistory(div, items) {
+  var html = '<table class="ml-history-table">';
+  html += '<thead><tr>';
+  html += '<th>' + t("ml.date") + '</th>';
+  html += '<th>' + t("ml.modelLabel") + '</th>';
+  html += '<th>' + t("ml.tabs.predict") + '</th>';
+  html += '<th>' + t("common.rows") + '</th>';
+  html += '</tr></thead>';
+  html += '<tbody>';
+
+  items.forEach(function (item) {
+    var dt = item.created_at ? new Date(item.created_at) : null;
+    var dateStr = dt ? dt.toLocaleDateString() + " " + dt.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "-";
+    var preds = Array.isArray(item.predictions) ? item.predictions : [];
+    var previewPreds = preds.slice(0, 3).map(function (p) { return escapeHtml(String(p)); }).join(", ");
+    if (preds.length > 3) previewPreds += "...";
+
+    html += '<tr>';
+    html += '<td style="white-space:nowrap;font-size:0.78rem;">' + dateStr + '</td>';
+    html += '<td><strong>' + escapeHtml(item.model_name || "") + '</strong><br><span style="font-size:0.72rem;color:var(--text-muted);">' + escapeHtml(item.algorithm || "") + '</span></td>';
+    html += '<td style="font-size:0.8rem;">' + previewPreds + '</td>';
+    html += '<td>' + (item.row_count || 0) + '</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  div.innerHTML = html;
+}
+
+function clearPredictionHistory() {
+  showMLConfirm(t("ml.clearHistoryConfirm"), async function () {
+    try {
+      var res = await fetch(API_BASE + "/api/ml/predictions", {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+        credentials: "include",
+      });
+      if (handleAuthError(res)) return;
+      var data = await res.json();
+      if (data.success) {
+        _showMLToast(t("ml.historyCleared"));
+        loadPredictionHistory();
+      }
+    } catch (e) {
+      _showMLToast(t("common.connectionError"), "error");
+    }
+  });
 }

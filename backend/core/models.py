@@ -100,6 +100,7 @@ class MLTrainRequest(BaseModel):
     algorithms: list[str] = Field(..., min_length=1, description="Secili algoritma adlari")
     train_split: float = Field(default=0.8, ge=0.6, le=0.9)
     cv_folds: int = Field(default=5, ge=2, le=10)
+    auto_tune: bool = Field(default=False, description="Otomatik hyperparameter tuning")
 
     @field_validator("problem_type")
     @classmethod
@@ -113,6 +114,7 @@ class MLPredictRequest(BaseModel):
     """Tahmin istegi."""
     model_id: int = Field(..., description="Kaydedilmis model ID")
     data: list = Field(..., description="Tahmin verisi [[headers], [row1], ...]")
+    explain: bool = Field(default=False, description="Tahmin aciklamasi dondur")
 
 
 # =================== DB CONNECTION MODELS ===================

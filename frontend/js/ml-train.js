@@ -4,6 +4,7 @@
 
 // Chart instances (memory leak prevention)
 var _mlChartInstances = [];
+var _currentFIResults = null;
 
 // =================== START TRAINING ===================
 
@@ -33,6 +34,7 @@ async function startTraining() {
       algorithms: mlSelectedAlgos,
       train_split: mlTrainSplit / 100,
       cv_folds: mlCVFolds,
+      auto_tune: mlAutoTune,
     };
 
     var res = await fetch(API_BASE + "/api/ml/train", {
@@ -176,6 +178,10 @@ function _simulateTrainingLog(algoCount) {
     var name = algoNames[key] || key;
     steps.push({ icon: "fas fa-cog fa-spin", text: (t("ml.logTrainingAlgo") || "{algo} egitiliyor...").replace("{algo}", name) });
   });
+
+  if (mlAutoTune) {
+    steps.push({ icon: "fas fa-sliders-h", text: t("ml.logTuning") || "Hyperparameter tuning yapiliyor..." });
+  }
 
   steps.push({ icon: "fas fa-chart-bar", text: t("ml.logEvaluating") || "Modeller degerlendiriliyor..." });
   steps.push({ icon: "fas fa-save", text: t("ml.logSaving") || "En iyi model kaydediliyor..." });
@@ -323,6 +329,14 @@ function renderLeaderboard(results) {
     html += '<td><span class="ml-rank-badge' + rankClass + '">' + rank + '</span></td>';
     html += '<td><strong>' + escapeHtml(m.name || m.algorithm) + '</strong>';
     if (isBest) html += ' <i class="fas fa-crown" style="color:#f59e0b;font-size:0.75rem;"></i>';
+    if (m.best_params) {
+      html += '<div class="ml-best-params">';
+      var pKeys = Object.keys(m.best_params);
+      pKeys.forEach(function (pk) {
+        html += '<span class="ml-param-val">' + escapeHtml(pk) + '=' + escapeHtml(String(m.best_params[pk])) + '</span>';
+      });
+      html += '</div>';
+    }
     html += '</td>';
 
     metricCols.forEach(function (mc) {
@@ -424,10 +438,23 @@ function renderViz(results) {
     html += '</div>';
   }
 
-  // Feature Importance
-  if (bestModel.feature_importances && featureNames.length > 0) {
+  // Feature Importance (per-model dropdown)
+  var _fiModels = results.models.filter(function (m) { return m.feature_importances; });
+  if (_fiModels.length > 0 && featureNames.length > 0) {
+    _currentFIResults = results;
     html += '<div class="ml-viz-card">';
-    html += '<h4><i class="fas fa-sort-amount-down"></i> Feature Importance</h4>';
+    html += '<h4 class="ml-viz-header"><i class="fas fa-sort-amount-down"></i> Feature Importance';
+    if (_fiModels.length > 1) {
+      html += ' <select class="ml-fi-model-select" id="fiModelSelect" onchange="onFIModelChange()">';
+      results.models.forEach(function (m, i) {
+        if (m.feature_importances) {
+          var sel = m.is_best ? ' selected' : '';
+          html += '<option value="' + i + '"' + sel + '>' + escapeHtml(m.name || m.algorithm) + '</option>';
+        }
+      });
+      html += '</select>';
+    }
+    html += '</h4>';
     html += '<div class="ml-chart-container"><canvas id="fiCanvas"></canvas></div>';
     html += '</div>';
   }
@@ -455,6 +482,27 @@ function renderViz(results) {
     }
     _drawModelComparison("compareCanvas", results.models, problemType);
   }, 100);
+}
+
+
+// ---- Feature Importance Model Switcher ----
+
+function onFIModelChange() {
+  var sel = document.getElementById("fiModelSelect");
+  if (!sel || !_currentFIResults) return;
+  var idx = parseInt(sel.value);
+  var model = _currentFIResults.models[idx];
+  var featureNames = _currentFIResults.feature_names || [];
+
+  // Mevcut FI chart'i yok et
+  _mlChartInstances = _mlChartInstances.filter(function (c) {
+    if (c.canvas && c.canvas.id === "fiCanvas") { c.destroy(); return false; }
+    return true;
+  });
+
+  if (model && model.feature_importances && featureNames.length > 0) {
+    _drawFeatureImportance("fiCanvas", model.feature_importances, featureNames);
+  }
 }
 
 

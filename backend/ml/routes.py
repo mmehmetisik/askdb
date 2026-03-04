@@ -14,7 +14,8 @@ from backend.sql.execution.database import get_auth_adapter
 from backend.core.models import MLTrainRequest, MLPredictRequest
 from backend.ml.engine import (
     run_training_job, save_model_file, delete_model_file,
-    predict_with_model, CLASSIFICATION_ALGORITHMS, REGRESSION_ALGORITHMS,
+    predict_with_model, predict_with_explanation,
+    CLASSIFICATION_ALGORITHMS, REGRESSION_ALGORITHMS,
     ML_MODELS_DIR,
 )
 
@@ -111,6 +112,7 @@ async def start_training(req: MLTrainRequest, user: dict = Depends(require_data_
         "algorithms": req.algorithms,
         "train_split": req.train_split,
         "cv_folds": req.cv_folds,
+        "auto_tune": req.auto_tune,
     }
 
     task = asyncio.create_task(_background_train_async(job_id, task_data, config, my_id))
@@ -209,6 +211,7 @@ async def _save_training_results(job_id, result, config, user_id):
             "roc_curve": m.get("roc_curve"),
             "feature_importances": m.get("feature_importances"),
             "cv_scores": m.get("cv_scores"),
+            "best_params": m.get("best_params"),
         })
 
     # Job guncelle
@@ -387,20 +390,89 @@ async def run_prediction(req: MLPredictRequest, user: dict = Depends(require_dat
 
     try:
         loop = asyncio.get_running_loop()
-        predictions = await loop.run_in_executor(
-            None, predict_with_model, r["file_path"], req.data
-        )
+        explanations = []
 
-        return {
+        if getattr(req, "explain", False):
+            predictions, explanations = await loop.run_in_executor(
+                None, predict_with_explanation, r["file_path"], req.data
+            )
+        else:
+            predictions = await loop.run_in_executor(
+                None, predict_with_model, r["file_path"], req.data
+            )
+
+        pred_strs = [str(p) for p in predictions]
+
+        # Log prediction to history
+        try:
+            my_id = user["id"] if isinstance(user, dict) else user[0]
+            input_summary = json.dumps(req.data[0][:5], ensure_ascii=False) if req.data else "[]"
+            pred_json = json.dumps(pred_strs[:50], ensure_ascii=False)
+            await adapter.execute_command(
+                """INSERT INTO ml_predictions
+                   (ml_model_id, model_name, algorithm, target_column,
+                    input_summary, predictions, row_count, created_by)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+                req.model_id, r["model_name"], r["algorithm"], r["target_column"] or "",
+                input_summary, pred_json, len(pred_strs), my_id,
+            )
+        except Exception as log_err:
+            logger.warning(f"[ML PREDICT] History log failed: {log_err}")
+
+        result = {
             "success": True,
-            "predictions": [str(p) for p in predictions],
+            "predictions": pred_strs,
             "model_name": r["model_name"],
             "target_column": r["target_column"],
             "algorithm": r["algorithm"],
         }
+        if explanations:
+            result["explanations"] = explanations
+        return result
     except Exception as e:
         logger.error(f"[ML PREDICT] Hata: {e}")
         raise HTTPException(status_code=500, detail=f"Tahmin hatasi: {str(e)}")
+
+
+# =================== PREDICTION HISTORY ===================
+
+@ml_router.get("/predictions")
+async def get_prediction_history(user: dict = Depends(require_data_scientist)):
+    """Son 50 tahmin gecmisini dondur."""
+    adapter = await get_auth_adapter()
+    rows = await adapter.fetch(
+        """SELECT id, ml_model_id, model_name, algorithm, target_column,
+                  input_summary, predictions, row_count, created_at
+           FROM ml_predictions
+           ORDER BY created_at DESC
+           LIMIT 50"""
+    )
+    items = []
+    for row in rows:
+        r = dict(row) if hasattr(row, "keys") else {
+            "id": row[0], "ml_model_id": row[1], "model_name": row[2],
+            "algorithm": row[3], "target_column": row[4], "input_summary": row[5],
+            "predictions": row[6], "row_count": row[7], "created_at": row[8],
+        }
+        # Parse JSON strings
+        for key in ("predictions", "input_summary"):
+            if isinstance(r.get(key), str):
+                try:
+                    r[key] = json.loads(r[key])
+                except Exception:
+                    pass
+        if r.get("created_at"):
+            r["created_at"] = str(r["created_at"])
+        items.append(r)
+    return {"success": True, "predictions": items}
+
+
+@ml_router.delete("/predictions")
+async def clear_prediction_history(user: dict = Depends(require_data_scientist)):
+    """Tahmin gecmisini temizle."""
+    adapter = await get_auth_adapter()
+    await adapter.execute_command("DELETE FROM ml_predictions")
+    return {"success": True, "message": "Tahmin gecmisi temizlendi"}
 
 
 # =================== ALGORITMA LISTESI ===================

@@ -29,6 +29,7 @@ var mlSelectedFeatures = [];
 var mlSelectedAlgos = [];
 var mlTrainSplit = 80;
 var mlCVFolds = 5;
+var mlAutoTune = false;
 var _lastMLTaskId = null;
 
 
@@ -72,6 +73,22 @@ function renderMLConfig() {
   html += '<div class="ml-summary-card"><span class="ml-summary-num">' + escapeHtml(mlSelectedTarget) + '</span><span class="ml-summary-label">' + t("ml.targetLabel") + '</span></div>';
   html += '<div class="ml-summary-card"><span class="ml-summary-num">' + (task.cleaning_steps ? task.cleaning_steps.length : 0) + '</span><span class="ml-summary-label">' + t("ml.cleaningLabel") + '</span></div>';
   html += '</div></div>';
+
+  // 1.5 Korelasyon Matrisi (sadece sayisal kolonlar icin)
+  var _numericIndices = [];
+  var _numericNames = [];
+  headers.forEach(function (h, i) {
+    if (_getColType(i, colTypes) === "numeric") {
+      _numericIndices.push(i);
+      _numericNames.push(h);
+    }
+  });
+  if (_numericIndices.length >= 2 && _numericIndices.length <= 30) {
+    html += '<div class="ml-config-section">';
+    html += '<h4><i class="fas fa-th"></i> ' + t("ml.correlationMatrix") + '</h4>';
+    html += '<div class="ml-corr-container"><canvas id="corrCanvas"></canvas></div>';
+    html += '</div>';
+  }
 
   // 2. Hedef Degisken
   html += '<div class="ml-config-section">';
@@ -148,7 +165,20 @@ function renderMLConfig() {
   html += '</select>';
   html += '</div>';
 
-  // 8. Train Button
+  // 8. Auto Tune Toggle
+  html += '<div class="ml-config-section">';
+  html += '<h4><i class="fas fa-sliders-h"></i> ' + t("ml.autoTune") + '</h4>';
+  html += '<label class="ml-toggle-row">';
+  html += '<span class="ml-toggle-text">' + t("ml.autoTuneDesc") + '</span>';
+  html += '<span class="ml-toggle">';
+  html += '<input type="checkbox" id="autoTuneToggle" onchange="onAutoTuneChange()"' + (mlAutoTune ? ' checked' : '') + '>';
+  html += '<span class="ml-toggle-slider"></span>';
+  html += '</span>';
+  html += '</label>';
+  html += '<p class="ml-hint-text">' + t("ml.autoTuneHint") + '</p>';
+  html += '</div>';
+
+  // 9. Train Button
   html += '<div style="text-align:center;padding:10px 0;">';
   html += '<button class="ml-train-btn" onclick="startTraining()" id="trainBtn">';
   html += '<i class="fas fa-rocket"></i> ' + t("ml.startTraining");
@@ -156,6 +186,11 @@ function renderMLConfig() {
   html += '</div>';
 
   panel.innerHTML = html;
+
+  // Korelasyon matrisi ciz (canvas yuklenince)
+  if (_numericIndices.length >= 2 && _numericIndices.length <= 30) {
+    setTimeout(function () { _drawCorrelationMatrix("corrCanvas", data, _numericIndices, _numericNames); }, 50);
+  }
 
   // Default algo selection — tum algoritmalar secili baslat
   var algos = mlProblemType === "classification" ? ML_CLASSIFICATION_ALGOS : ML_REGRESSION_ALGOS;
@@ -290,4 +325,131 @@ function onSplitChange() {
 function onCVChange() {
   var sel = document.getElementById("cvSelect");
   if (sel) mlCVFolds = parseInt(sel.value);
+}
+
+function onAutoTuneChange() {
+  var cb = document.getElementById("autoTuneToggle");
+  mlAutoTune = cb ? cb.checked : false;
+}
+
+
+// =================== CORRELATION MATRIX ===================
+
+function _computeCorrelation(data, numericIndices) {
+  var rows = data.slice(1);
+  var n = numericIndices.length;
+
+  // Sayisal kolonlari float dizilerine cikart
+  var cols = [];
+  for (var ci = 0; ci < n; ci++) {
+    var colIdx = numericIndices[ci];
+    var values = [];
+    for (var ri = 0; ri < rows.length; ri++) {
+      var v = parseFloat(rows[ri][colIdx]);
+      values.push(isNaN(v) ? 0 : v);
+    }
+    cols.push(values);
+  }
+
+  // Ortalamalar
+  var means = cols.map(function (col) {
+    var sum = 0;
+    for (var k = 0; k < col.length; k++) sum += col[k];
+    return sum / col.length;
+  });
+
+  // Pearson korelasyon matrisi
+  var corr = [];
+  for (var i = 0; i < n; i++) {
+    corr[i] = [];
+    for (var j = 0; j < n; j++) {
+      var sumXY = 0, sumX2 = 0, sumY2 = 0;
+      for (var k = 0; k < cols[i].length; k++) {
+        var dx = cols[i][k] - means[i];
+        var dy = cols[j][k] - means[j];
+        sumXY += dx * dy;
+        sumX2 += dx * dx;
+        sumY2 += dy * dy;
+      }
+      var denom = Math.sqrt(sumX2 * sumY2);
+      corr[i][j] = denom > 0 ? sumXY / denom : 0;
+    }
+  }
+  return corr;
+}
+
+function _drawCorrelationMatrix(canvasId, data, numericIndices, numericNames) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  var ctx = canvas.getContext("2d");
+
+  var corr = _computeCorrelation(data, numericIndices);
+  var n = numericNames.length;
+  var cellSize = Math.min(50, Math.floor(320 / n));
+  if (cellSize < 20) cellSize = 20;
+  var margin = 90;
+
+  var dpr = window.devicePixelRatio || 1;
+  var w = margin + n * cellSize + 20;
+  var h = margin + n * cellSize + 10;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  ctx.scale(dpr, dpr);
+
+  // Arka plan temizle
+  ctx.clearRect(0, 0, w, h);
+
+  // Hucreleri ciz
+  for (var r = 0; r < n; r++) {
+    for (var c = 0; c < n; c++) {
+      var x = margin + c * cellSize;
+      var y = margin + r * cellSize;
+      var val = corr[r][c];
+
+      // Renk: Mavi (negatif) -> Saydam (0) -> Kirmizi (pozitif)
+      var alpha = Math.min(Math.abs(val) * 0.85, 0.85);
+      if (val >= 0) {
+        ctx.fillStyle = "rgba(239, 68, 68, " + alpha + ")";
+      } else {
+        ctx.fillStyle = "rgba(59, 130, 246, " + alpha + ")";
+      }
+      ctx.fillRect(x, y, cellSize, cellSize);
+
+      // Hucre cercevesi
+      ctx.strokeStyle = "rgba(148, 163, 184, 0.15)";
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(x, y, cellSize, cellSize);
+
+      // Deger metni
+      if (cellSize >= 28) {
+        ctx.fillStyle = Math.abs(val) > 0.5 ? "#ffffff" : "#94a3b8";
+        ctx.font = Math.max(8, Math.min(11, cellSize / 4.5)) + "px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(val.toFixed(2), x + cellSize / 2, y + cellSize / 2);
+      }
+    }
+  }
+
+  // Etiketler
+  ctx.fillStyle = "#94a3b8";
+  var fontSize = Math.max(8, Math.min(11, cellSize / 3.5));
+  ctx.font = fontSize + "px Inter, sans-serif";
+  for (var i = 0; i < n; i++) {
+    var label = numericNames[i].length > 12 ? numericNames[i].substring(0, 11) + ".." : numericNames[i];
+    // Ust etiketler (dondurulmus)
+    ctx.save();
+    ctx.translate(margin + i * cellSize + cellSize / 2, margin - 6);
+    ctx.rotate(-Math.PI / 4);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+    // Sol etiketler
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, margin - 6, margin + i * cellSize + cellSize / 2);
+  }
 }

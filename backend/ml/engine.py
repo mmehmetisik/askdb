@@ -10,7 +10,7 @@ import math
 import logging
 import traceback
 import numpy as np
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, RandomizedSearchCV
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
@@ -48,6 +48,24 @@ REGRESSION_ALGORITHMS = {
 }
 
 ML_MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ml_models")
+
+
+# =================== HYPERPARAM GRIDS (AutoTune) ===================
+
+HYPERPARAM_GRIDS = {
+    "logistic_regression": {"C": [0.01, 0.1, 1, 10], "solver": ["lbfgs", "liblinear"]},
+    "random_forest": {"n_estimators": [50, 100, 200], "max_depth": [None, 10, 20, 30], "min_samples_split": [2, 5, 10]},
+    "gradient_boosting": {"n_estimators": [50, 100, 200], "learning_rate": [0.01, 0.05, 0.1, 0.2], "max_depth": [3, 5, 7]},
+    "svm": {"C": [0.1, 1, 10], "kernel": ["rbf", "linear"]},
+    "knn": {"n_neighbors": [3, 5, 7, 11], "weights": ["uniform", "distance"]},
+    "decision_tree": {"max_depth": [None, 5, 10, 20], "min_samples_split": [2, 5, 10]},
+    "linear_regression": {},
+    "ridge": {"alpha": [0.01, 0.1, 1, 10, 100]},
+    "lasso": {"alpha": [0.001, 0.01, 0.1, 1, 10]},
+    "random_forest_regressor": {"n_estimators": [50, 100, 200], "max_depth": [None, 10, 20, 30], "min_samples_split": [2, 5, 10]},
+    "gradient_boosting_regressor": {"n_estimators": [50, 100, 200], "learning_rate": [0.01, 0.05, 0.1, 0.2], "max_depth": [3, 5, 7]},
+    "svr": {"C": [0.1, 1, 10], "kernel": ["rbf", "linear"]},
+}
 
 
 # =================== PREPROCESSING ===================
@@ -221,20 +239,47 @@ def _safe_float(val):
     return round(float(val), 4)
 
 
+def _count_combos(param_grid):
+    """Param grid'deki toplam kombinasyon sayisini hesapla."""
+    total = 1
+    for v in param_grid.values():
+        total *= len(v) if isinstance(v, list) else 1
+    return total
+
+
 def train_single_model(algo_key, algo_name, model_class, model_params,
                        X_train, y_train, X_test, y_test,
-                       problem_type, cv_folds, class_names=None):
+                       problem_type, cv_folds, class_names=None, auto_tune=False):
     """Tek bir modeli egit ve metriklerini hesapla."""
     try:
-        model = model_class(**model_params)
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
+        best_params = None
+
+        if auto_tune and algo_key in HYPERPARAM_GRIDS and HYPERPARAM_GRIDS[algo_key]:
+            param_grid = HYPERPARAM_GRIDS[algo_key]
+            base_params = {k: v for k, v in model_params.items() if k not in param_grid}
+            scoring = "accuracy" if problem_type == "classification" else "r2"
+            base_model = model_class(**base_params)
+            search = RandomizedSearchCV(
+                base_model, param_grid,
+                n_iter=min(10, max(1, _count_combos(param_grid))),
+                cv=min(cv_folds, len(X_train)),
+                scoring=scoring, random_state=42, n_jobs=-1, error_score="raise",
+            )
+            search.fit(X_train, y_train)
+            model = search.best_estimator_
+            best_params = search.best_params_
+            y_pred = model.predict(X_test)
+        else:
+            model = model_class(**model_params)
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
 
         result = {
             "algorithm": algo_key,
             "name": algo_name,
             "metrics": {},
             "model_object": model,
+            "best_params": best_params,
         }
 
         if problem_type == "classification":
@@ -358,6 +403,7 @@ def run_training_job(task_data_json, config):
         algorithms = config["algorithms"]
         train_split = config.get("train_split", 0.8)
         cv_folds = config.get("cv_folds", 5)
+        auto_tune = config.get("auto_tune", False)
 
         # Preprocess
         pp = preprocess_data(data_2d, target_column, feature_columns, train_split)
@@ -379,7 +425,7 @@ def run_training_job(task_data_json, config):
             res = train_single_model(
                 algo_key, algo_name, model_class, model_params,
                 X_train, y_train, X_test, y_test,
-                problem_type, cv_folds, class_names
+                problem_type, cv_folds, class_names, auto_tune=auto_tune
             )
             res["preprocessor_info"] = preprocessor_info
             results.append(res)
@@ -564,3 +610,63 @@ def predict_with_model(filepath, input_data_2d):
         return decoded
     else:
         return [_safe_float(p) for p in predictions]
+
+
+def predict_with_explanation(filepath, input_data_2d):
+    """
+    Tahmin + her satir icin basit yerel aciklama.
+    contribution = global_importance * |scaled_value|
+    """
+    bundle = load_model_file(filepath)
+    model = bundle["model"]
+    pp = bundle["preprocessor_info"]
+
+    # Once normal predict pipeline
+    predictions = predict_with_model(filepath, input_data_2d)
+
+    # Feature importances
+    if hasattr(model, "feature_importances_"):
+        importances = model.feature_importances_
+    elif hasattr(model, "coef_"):
+        coef = model.coef_
+        importances = np.mean(np.abs(coef), axis=0) if coef.ndim > 1 else np.abs(coef)
+    else:
+        return predictions, []
+
+    feature_names = pp["feature_names"]
+    if len(importances) != len(feature_names):
+        return predictions, []
+
+    # Preprocess input — X_final'i yeniden olustur
+    headers = [str(h) for h in input_data_2d[0]]
+    rows = input_data_2d[1:]
+    feature_indices = []
+    for fn in feature_names:
+        feature_indices.append(headers.index(fn) if fn in headers else -1)
+
+    X_raw = []
+    for row in rows:
+        x_row = []
+        for fi in feature_indices:
+            x_row.append(row[fi] if fi >= 0 and fi < len(row) else None)
+        X_raw.append(x_row)
+
+    explanations = []
+    for ri in range(len(X_raw)):
+        contributions = []
+        for fi in range(len(feature_names)):
+            raw_val = X_raw[ri][fi]
+            try:
+                num_val = float(raw_val) if raw_val is not None else 0
+            except (ValueError, TypeError):
+                num_val = 0
+            contrib = float(importances[fi]) * abs(num_val)
+            contributions.append({
+                "feature": feature_names[fi],
+                "importance": round(float(importances[fi]), 4),
+                "contribution": round(contrib, 4)
+            })
+        contributions.sort(key=lambda c: c["contribution"], reverse=True)
+        explanations.append(contributions[:5])
+
+    return predictions, explanations
