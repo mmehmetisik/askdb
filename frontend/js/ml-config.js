@@ -29,6 +29,7 @@ var mlSelectedFeatures = [];
 var mlSelectedAlgos = [];
 var mlTrainSplit = 80;
 var mlCVFolds = 5;
+var _lastMLTaskId = null;
 
 
 function renderMLConfig() {
@@ -47,19 +48,18 @@ function renderMLConfig() {
   var colCount = headers.length;
   var colTypes = task.column_types || [];
 
-  // Auto-detect target
-  var targetIdx = task.target_column;
-  if (targetIdx !== null && targetIdx !== undefined && targetIdx >= 0 && targetIdx < headers.length) {
-    mlSelectedTarget = headers[targetIdx];
-  } else {
-    mlSelectedTarget = headers[headers.length - 1]; // Son kolon default
+  // Auto-detect only on new task load (don't override user selections on re-render)
+  if (_lastMLTaskId !== task.id) {
+    _lastMLTaskId = task.id;
+    var targetIdx = task.target_column;
+    if (targetIdx !== null && targetIdx !== undefined && targetIdx >= 0 && targetIdx < headers.length) {
+      mlSelectedTarget = headers[targetIdx];
+    } else {
+      mlSelectedTarget = headers[headers.length - 1];
+    }
+    mlProblemType = _autoDetectProblemType(data, mlSelectedTarget, headers, colTypes);
+    mlSelectedFeatures = headers.filter(function (h) { return h !== mlSelectedTarget; });
   }
-
-  // Auto-detect problem type
-  mlProblemType = _autoDetectProblemType(data, mlSelectedTarget, headers, colTypes);
-
-  // Default: tum features (hedef haric)
-  mlSelectedFeatures = headers.filter(function (h) { return h !== mlSelectedTarget; });
 
   var html = "";
 
@@ -226,10 +226,12 @@ function onTargetChange() {
   if (!sel) return;
   mlSelectedTarget = sel.value;
 
-  // Problem tipini yeniden algila
   if (currentMLTask && currentMLTask.data) {
     var headers = currentMLTask.data[0].map(function (h) { return String(h); });
+    // Problem tipini yeniden algila
     mlProblemType = _autoDetectProblemType(currentMLTask.data, mlSelectedTarget, headers, currentMLTask.column_types);
+    // Feature listesini guncelle (yeni hedef haric)
+    mlSelectedFeatures = headers.filter(function (h) { return h !== mlSelectedTarget; });
   }
 
   // Re-render (full)
