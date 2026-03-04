@@ -109,6 +109,16 @@ async function sendToML() {
     return;
   }
 
+  // Build column_types from EDA data
+  var colTypes = [];
+  if (aEdaData && aEdaData.columns && exportData[0]) {
+    var headers = exportData[0];
+    for (var ci = 0; ci < headers.length; ci++) {
+      var edaCol = aEdaData.columns.find(function (c) { return c.name === headers[ci]; });
+      colTypes.push(edaCol ? edaCol.col_type : "text");
+    }
+  }
+
   // Prepare payload
   var payload = {
     source_report_id: currentReport.id,
@@ -116,7 +126,7 @@ async function sendToML() {
     note: note,
     target_column: targetCol ? parseInt(targetCol) : null,
     data: exportData,
-    column_types: [],
+    column_types: colTypes,
     cleaning_steps: aOperationHistory ? aOperationHistory.map(function (h) { return h.description; }) : [],
     filters_applied: [],
     row_count: exportData.length - 1,
