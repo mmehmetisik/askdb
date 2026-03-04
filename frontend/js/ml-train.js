@@ -47,7 +47,7 @@ async function startTraining() {
 
     if (!data.success) {
       _showMLToast(t("ml.trainFailed") + (data.detail || data.error || ""), "error");
-      if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-play"></i> ' + t("ml.startTraining"); }
+      if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-rocket"></i> ' + t("ml.startTraining"); }
       return;
     }
 
@@ -63,7 +63,7 @@ async function startTraining() {
 
   } catch (e) {
     _showMLToast(t("common.connectionError") + ": " + e.message, "error");
-    if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-play"></i> ' + t("ml.startTraining"); }
+    if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-rocket"></i> ' + t("ml.startTraining"); }
   }
 }
 
@@ -88,6 +88,7 @@ async function _pollTrainingStatus(jobId) {
     if (data.status === "completed") {
       clearInterval(pollingInterval);
       pollingInterval = null;
+      if (_trainingLogInterval) { clearInterval(_trainingLogInterval); _trainingLogInterval = null; }
       trainResults = data.results || {};
       _updateJobStatus("completed");
 
@@ -100,18 +101,19 @@ async function _pollTrainingStatus(jobId) {
 
       // Train butonunu resetle
       var trainBtn = document.getElementById("trainBtn");
-      if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-play"></i> ' + t("ml.startTraining"); }
+      if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-rocket"></i> ' + t("ml.startTraining"); }
 
       _showMLToast(t("ml.trainCompleted", {count: (trainResults.models ? trainResults.models.length : 0)}));
 
     } else if (data.status === "failed") {
       clearInterval(pollingInterval);
       pollingInterval = null;
+      if (_trainingLogInterval) { clearInterval(_trainingLogInterval); _trainingLogInterval = null; }
       _updateJobStatus("failed");
       _showTrainingError(data.error_message || t("ml.trainError"));
 
       var trainBtn2 = document.getElementById("trainBtn");
-      if (trainBtn2) { trainBtn2.disabled = false; trainBtn2.innerHTML = '<i class="fas fa-play"></i> ' + t("ml.startTraining"); }
+      if (trainBtn2) { trainBtn2.disabled = false; trainBtn2.innerHTML = '<i class="fas fa-rocket"></i> ' + t("ml.startTraining"); }
     }
     // running -> devam
   } catch (e) {
@@ -122,18 +124,93 @@ async function _pollTrainingStatus(jobId) {
 
 // =================== TRAINING UI HELPERS ===================
 
+var _trainingLogInterval = null;
+
 function _showTrainingProgress() {
   var panel = document.getElementById("mlLeaderboardPanel");
   if (!panel) return;
+
+  var algoCount = mlSelectedAlgos.length;
+
   panel.innerHTML =
-    '<div class="ml-training-indicator">' +
-    '<div class="ml-training-spinner"></div>' +
-    '<div class="ml-training-text">' + t("ml.trainingModels") + '</div>' +
-    '<div class="ml-training-sub">' + t("ml.trainingAlgoCount", {count: mlSelectedAlgos.length}) + '</div>' +
-    '<button class="ml-stop-btn" onclick="cancelTraining()" id="cancelBtn">' +
-    '<i class="fas fa-stop"></i> ' + t("ml.stopTraining") +
-    '</button>' +
+    '<div class="ml-training-panel">' +
+      '<div class="ml-training-header">' +
+        '<div class="ml-training-spinner"></div>' +
+        '<div>' +
+          '<div class="ml-training-text">' + t("ml.trainingModels") + '</div>' +
+          '<div class="ml-training-sub">' + t("ml.trainingAlgoCount", {count: algoCount}) + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="ml-training-progress-bar"><div class="ml-training-progress-fill" id="mlProgressFill"></div></div>' +
+      '<div class="ml-training-log" id="mlTrainingLog"></div>' +
+      '<button class="ml-stop-btn" onclick="cancelTraining()" id="cancelBtn">' +
+        '<i class="fas fa-stop"></i> ' + t("ml.stopTraining") +
+      '</button>' +
     '</div>';
+
+  _simulateTrainingLog(algoCount);
+}
+
+function _simulateTrainingLog(algoCount) {
+  if (_trainingLogInterval) { clearInterval(_trainingLogInterval); _trainingLogInterval = null; }
+  var logEl = document.getElementById("mlTrainingLog");
+  var fillEl = document.getElementById("mlProgressFill");
+  if (!logEl) return;
+
+  var steps = [
+    { icon: "fas fa-database", text: t("ml.logLoadingData") || "Veri yukleniyor..." },
+    { icon: "fas fa-broom", text: t("ml.logPreprocessing") || "On isleme yapiliyor..." },
+    { icon: "fas fa-columns", text: t("ml.logEncoding") || "Kategorik degiskenler kodlaniyor..." },
+    { icon: "fas fa-balance-scale", text: t("ml.logScaling") || "Veri olceklendiriliyor..." },
+    { icon: "fas fa-cut", text: t("ml.logSplitting") || "Train/Test bolunuyor..." },
+  ];
+
+  // Add per-algorithm steps
+  var algoNames = {
+    logistic_regression: "Logistic Regression", random_forest: "Random Forest",
+    gradient_boosting: "Gradient Boosting", svm: "SVM", knn: "KNN", decision_tree: "Decision Tree",
+    linear_regression: "Linear Regression", ridge: "Ridge Regression", lasso: "Lasso Regression",
+    random_forest_regressor: "Random Forest Regressor", gradient_boosting_regressor: "Gradient Boosting Regressor", svr: "SVR"
+  };
+  mlSelectedAlgos.forEach(function(key) {
+    var name = algoNames[key] || key;
+    steps.push({ icon: "fas fa-cog fa-spin", text: (t("ml.logTrainingAlgo") || "{algo} egitiliyor...").replace("{algo}", name) });
+  });
+
+  steps.push({ icon: "fas fa-chart-bar", text: t("ml.logEvaluating") || "Modeller degerlendiriliyor..." });
+  steps.push({ icon: "fas fa-save", text: t("ml.logSaving") || "En iyi model kaydediliyor..." });
+
+  var currentStep = 0;
+  var totalSteps = steps.length;
+
+  function addLogLine() {
+    if (currentStep >= totalSteps) {
+      if (_trainingLogInterval) { clearInterval(_trainingLogInterval); _trainingLogInterval = null; }
+      return;
+    }
+    var step = steps[currentStep];
+    var line = document.createElement("div");
+    line.className = "ml-log-line ml-log-line-enter";
+    line.innerHTML = '<i class="' + step.icon + '"></i> <span>' + step.text + '</span>';
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+
+    // Mark previous as done
+    var prev = logEl.querySelectorAll(".ml-log-line");
+    if (prev.length > 1) {
+      var prevLine = prev[prev.length - 2];
+      var prevIcon = prevLine.querySelector("i");
+      if (prevIcon) { prevIcon.className = "fas fa-check"; }
+      prevLine.classList.add("ml-log-done");
+    }
+
+    currentStep++;
+    if (fillEl) { fillEl.style.width = Math.round((currentStep / totalSteps) * 100) + "%"; }
+  }
+
+  // First step immediately
+  addLogLine();
+  _trainingLogInterval = setInterval(addLogLine, 2500);
 }
 
 async function cancelTraining() {
@@ -149,15 +226,16 @@ async function cancelTraining() {
     });
     if (handleAuthError(res)) return;
 
-    // Polling durdur
+    // Polling ve log durdur
     if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+    if (_trainingLogInterval) { clearInterval(_trainingLogInterval); _trainingLogInterval = null; }
 
     // UI resetle
     _showTrainingError(t("ml.stoppedByUser"));
     _updateJobStatus("failed");
 
     var trainBtn = document.getElementById("trainBtn");
-    if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-play"></i> ' + t("ml.startTraining"); }
+    if (trainBtn) { trainBtn.disabled = false; trainBtn.innerHTML = '<i class="fas fa-rocket"></i> ' + t("ml.startTraining"); }
 
     _showMLToast(t("ml.trainStopped"));
   } catch (e) {

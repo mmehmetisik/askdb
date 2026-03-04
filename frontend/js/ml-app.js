@@ -196,8 +196,10 @@ async function loadSavedModels() {
 
 async function deleteModel(modelId, event) {
   if (event) event.stopPropagation();
-  if (!confirm(t("ml.deleteModelConfirm"))) return;
+  showMLConfirm(t("ml.deleteModelConfirm"), function() { _doDeleteModel(modelId); });
+}
 
+async function _doDeleteModel(modelId) {
   try {
     var res = await fetch(API_BASE + "/api/ml/models/" + modelId, {
       method: "DELETE",
@@ -330,4 +332,30 @@ function _showMLToast(msg, type) {
     t.classList.remove("show");
     setTimeout(function () { t.remove(); }, 300);
   }, 3000);
+}
+
+
+// =================== CUSTOM CONFIRM MODAL ===================
+
+var _mlConfirmCallback = null;
+
+function showMLConfirm(message, callback) {
+  var modal = document.getElementById("mlConfirmModal");
+  var msgEl = document.getElementById("mlConfirmMessage");
+  if (!modal || !msgEl) { if (confirm(message)) callback(); return; }
+  msgEl.textContent = message;
+  _mlConfirmCallback = callback;
+  modal.style.display = "flex";
+}
+
+function _confirmMLAction() {
+  var modal = document.getElementById("mlConfirmModal");
+  if (modal) modal.style.display = "none";
+  if (_mlConfirmCallback) { _mlConfirmCallback(); _mlConfirmCallback = null; }
+}
+
+function _closeMLConfirm() {
+  var modal = document.getElementById("mlConfirmModal");
+  if (modal) modal.style.display = "none";
+  _mlConfirmCallback = null;
 }

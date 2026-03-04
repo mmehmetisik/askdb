@@ -288,63 +288,146 @@ html.light .ml-cv-select option {
   color: #1e293b;
 }
 
-/* Train Button */
-.ml-train-btn {
+/* Train Button — high specificity to override .analysis-layout button reset */
+.analysis-layout button.ml-train-btn {
   display: inline-flex !important;
   align-items: center;
-  gap: 8px;
-  padding: 12px 28px;
-  background: linear-gradient(135deg, var(--accent-primary), #7c3aed);
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 36px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
   color: white;
   border: none;
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-weight: 600;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   width: auto !important;
   margin-top: 8px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25);
+  position: relative;
+  overflow: hidden;
 }
-.ml-train-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+.analysis-layout button.ml-train-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s;
 }
-.ml-train-btn:disabled {
-  opacity: 0.6;
+.analysis-layout button.ml-train-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+}
+.analysis-layout button.ml-train-btn:hover::before {
+  opacity: 1;
+}
+.analysis-layout button.ml-train-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+.analysis-layout button.ml-train-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+}
+.analysis-layout button.ml-train-btn:disabled::before {
+  display: none;
+}
+.ml-train-btn .fa-rocket {
+  font-size: 1.05rem;
 }
 
 /* ---- Training Progress ---- */
-.ml-training-indicator {
+.ml-training-panel {
+  padding: 30px 24px;
+}
+.ml-training-header {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 .ml-training-spinner {
-  width: 64px;
-  height: 64px;
-  border: 4px solid var(--border-color);
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
   border-top-color: var(--accent-primary);
   border-radius: 50%;
-  animation: mlSpin 1s linear infinite;
-  margin-bottom: 20px;
+  animation: mlSpin 0.8s linear infinite;
+  flex-shrink: 0;
 }
 @keyframes mlSpin {
   to { transform: rotate(360deg); }
 }
 .ml-training-text {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   color: var(--text-main);
-  font-weight: 500;
-  margin-bottom: 8px;
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 .ml-training-sub {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+/* Progress Bar */
+.ml-training-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.ml-training-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* Training Log */
+.ml-training-log {
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px 16px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 0.82rem;
+}
+.ml-log-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  color: var(--accent-primary);
+  opacity: 0;
+  transform: translateY(6px);
+  animation: mlLogIn 0.3s ease forwards;
+}
+@keyframes mlLogIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+.ml-log-line i {
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+}
+.ml-log-done {
+  color: var(--text-muted);
+}
+.ml-log-done i {
+  color: #22c55e;
 }
 
 /* ---- Leaderboard ---- */
@@ -738,7 +821,7 @@ html.light .ml-predict-model-select option {
 }
 
 /* ---- Stop Training Button ---- */
-.ml-stop-btn {
+.analysis-layout button.ml-stop-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -753,11 +836,11 @@ html.light .ml-predict-model-select option {
   transition: all 0.2s;
   margin-top: 12px;
 }
-.ml-stop-btn:hover {
+.analysis-layout button.ml-stop-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
 }
-.ml-stop-btn:disabled {
+.analysis-layout button.ml-stop-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;

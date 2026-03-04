@@ -151,7 +151,7 @@ function renderMLConfig() {
   // 8. Train Button
   html += '<div style="text-align:center;padding:10px 0;">';
   html += '<button class="ml-train-btn" onclick="startTraining()" id="trainBtn">';
-  html += '<i class="fas fa-play"></i> ' + t("ml.startTraining");
+  html += '<i class="fas fa-rocket"></i> ' + t("ml.startTraining");
   html += '</button>';
   html += '</div>';
 
