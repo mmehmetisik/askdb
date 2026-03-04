@@ -111,8 +111,8 @@ function _getFeatureNames() {
   // currentMLTask'tan (hedef haric) al
   if (currentMLTask && currentMLTask.data && currentMLTask.data.length > 0) {
     var headers = currentMLTask.data[0].map(function (h) { return String(h); });
-    var targetIdx = currentMLTask.target_column;
-    return headers.filter(function (_, i) { return i !== targetIdx; });
+    var targetName = mlSelectedTarget || (currentMLTask.target_column != null ? headers[currentMLTask.target_column] : null);
+    return headers.filter(function (h) { return h !== targetName; });
   }
   return [];
 }
@@ -126,9 +126,11 @@ function _safeId(name) {
 
 function setPredictMode(mode) {
   mlPredictMode = mode;
-  document.querySelectorAll(".ml-predict-tab").forEach(function (btn) {
-    btn.classList.toggle("active", btn.textContent.toLowerCase().indexOf(mode === "manual" ? "manuel" : "csv") >= 0);
-  });
+  var tabs = document.querySelectorAll(".ml-predict-tab");
+  if (tabs.length >= 2) {
+    tabs[0].classList.toggle("active", mode === "manual");
+    tabs[1].classList.toggle("active", mode === "csv");
+  }
   var manualDiv = document.getElementById("manualInputDiv");
   var csvDiv = document.getElementById("csvInputDiv");
   if (manualDiv) manualDiv.style.display = mode === "manual" ? "" : "none";
