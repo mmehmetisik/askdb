@@ -20,10 +20,11 @@ class LLMProvider(ABC):
 
 
 class GroqProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile"):
+    def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile", key_index: int = 1):
         from groq import AsyncGroq
         self.client = AsyncGroq(api_key=api_key)
         self.model = model
+        self.key_index = key_index
 
     async def generate(self, messages: list[dict], temperature: float = 0, max_tokens: int = 512) -> str:
         response = await self.client.chat.completions.create(
@@ -35,7 +36,7 @@ class GroqProvider(LLMProvider):
         return response.choices[0].message.content.strip()
 
     def name(self) -> str:
-        return f"groq/{self.model}"
+        return f"groq/{self.model}[key-{self.key_index}]"
 
 
 class OpenAIProvider(LLMProvider):
@@ -132,12 +133,21 @@ def build_llm_chain() -> LLMChain:
         p = p.strip().lower()
         try:
             if p == "groq":
-                api_key = os.getenv("GROQ_API_KEY")
-                if not api_key:
+                model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+                # Coklu Groq key destegi: GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3, ...
+                groq_keys = []
+                primary = os.getenv("GROQ_API_KEY")
+                if primary:
+                    groq_keys.append(primary)
+                for i in range(2, 10):
+                    k = os.getenv(f"GROQ_API_KEY_{i}")
+                    if k:
+                        groq_keys.append(k)
+                if not groq_keys:
                     logger.warning("[LLM] GROQ_API_KEY not set, skipping")
                     continue
-                model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-                chain.add_provider(GroqProvider(api_key, model))
+                for idx, key in enumerate(groq_keys, 1):
+                    chain.add_provider(GroqProvider(key, model, key_index=idx))
 
             elif p == "openai":
                 api_key = os.getenv("OPENAI_API_KEY")
